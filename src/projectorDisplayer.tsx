@@ -18,6 +18,8 @@ export class ProjectorDisplayer extends React.Component<DisplayerProps, Displaye
 
     render(): ReactNode {
         return (
+            <React.Fragment>
+            {this.props.children}
             <div id="projector-frame" style={{
                 height: 400,
                 width: 400,
@@ -27,7 +29,7 @@ export class ProjectorDisplayer extends React.Component<DisplayerProps, Displaye
                     width: 300,
                 }}></div>
             </div>
-            
+        </React.Fragment>
         );
     }
 }

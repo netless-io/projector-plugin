@@ -1,8 +1,6 @@
 
-import React from "react";
-import ReactDom from "react-dom";
 import type { Room} from "white-web-sdk";
-import { PlayerPhase, WhiteWebSdk } from "white-web-sdk";
+import { WhiteWebSdk } from "white-web-sdk";
 import {ProjectorDisplayer, ProjectorPlugin} from "@netless/projector-plugin";
 import "./index.css";
 

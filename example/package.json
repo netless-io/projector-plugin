@@ -21,7 +21,6 @@
   "license": "ISC",
   "dependencies": {
     "@netless/projector-plugin": "0.0.1",
-    "@netless/slide": "0.4.1",
     "react": ">=16.8.0",
     "react-dom": ">=16.8.0",
     "white-web-sdk": "2.16.24"

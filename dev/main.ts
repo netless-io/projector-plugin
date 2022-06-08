@@ -27,28 +27,21 @@ async function main(): Promise<void> {
     : createRoom());
   (window as any).room = room;
 
-  console.log("start init plugin");
-  
   const projectorPlugin = new ProjectorPlugin({ kind: ProjectorPlugin.kind, displayer: room}, {
-    info: console.log,
-    error: console.error,
-    warn: console.warn,
-  }, {
-    errorCallback: (e: Error) => console.error(`catch ${e.stack}`)
+    logger: {
+      info: console.log,
+      error: console.error,
+      warn: console.warn,
+    }, 
+    callback: {
+      errorCallback: (e: Error) => console.error(`catch ${e.stack}`)
+    },
+    enableClickToNextStep: true,
   });
   await projectorPlugin.initSlide(room, devTaskUUID, devTaskPrefix);
   (window as any).projector = projectorPlugin;
 
-  function nextStep() {
-    projectorPlugin.nextStep();
-  }
-
-  function prevStep() {
-    projectorPlugin.prevStep();
-  }
-
-  (window as any).nextStep = nextStep;
-  (window as any).prevStep = prevStep;
+  bindKey(projectorPlugin);
 
   const appDiv = document.getElementById("app")
   if (appDiv) {
@@ -97,4 +90,23 @@ async function post<T>(path: string, body: unknown): Promise<T> {
     body: JSON.stringify(body),
   });
   return response.json();
+}
+
+/**
+ * 绑定键盘事件
+ */
+function bindKey(projectorPlugin: ProjectorPlugin): void {
+  banScroll();
+  document.onkeydown = (event) => {
+    if (event.code === "ArrowLeft") {
+      projectorPlugin.prevStep();
+    };
+    if (event.code === "ArrowRight") {
+      projectorPlugin.nextStep();
+    };
+  }
+}
+
+function banScroll(){ 
+    document.body.addEventListener('touchmove', (event) => event.preventDefault(), { passive: false });
 }

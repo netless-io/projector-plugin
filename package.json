@@ -1,6 +1,6 @@
 {
   "name": "@netless/projector-plugin",
-  "version": "0.0.1",
+  "version": "0.0.2",
   "description": "",
   "main": "./dist/projector-plugin.cjs.js",
   "module": "./dist/projector-plugin.es.js",
@@ -34,7 +34,8 @@
   "author": "netless",
   "license": "ISC",
   "dependencies": {
-    "react": ">=16.8.0",
-    "@netless/slide": "0.4.1"
+    "@netless/slide": "0.4.5",
+    "eventemitter2": "6.4.5",
+    "react": ">=16.8.0"
   }
 }

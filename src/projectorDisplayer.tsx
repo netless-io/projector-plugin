@@ -8,21 +8,12 @@ export interface DisplayerState {
 }
 
 export class ProjectorDisplayer extends React.Component<DisplayerProps, DisplayerState> {
-    static instance: ProjectorDisplayer | null = null;
+    static instance?: ProjectorDisplayer;
     public containerRef: HTMLDivElement | null = null;
     public taskUuid: string | undefined;
 
     public constructor(props: DisplayerProps) {
         super(props);
-        ProjectorPlugin.emitter.on(ProjectorEvents.UpdateParentContainerRect, () => {
-            if (this.containerRef) {
-                const parent = this.containerRef.parentElement;
-                if (parent) {
-                    const rect = parent.getBoundingClientRect();
-                    ProjectorPlugin.emitter.emit(ProjectorEvents.SetParentContainerRect, rect);
-                }
-            }
-        });
         ProjectorPlugin.emitter.on(ProjectorEvents.EnableClick, () => {
             if (this.containerRef) {
                 this.containerRef.style.pointerEvents = "auto";
@@ -36,7 +27,7 @@ export class ProjectorDisplayer extends React.Component<DisplayerProps, Displaye
     }
 
     componentDidMount(): void {
-        ProjectorPlugin.emitter.emit(ProjectorEvents.DisplayerDidMount);
+        ProjectorPlugin.emitter.emit(ProjectorEvents.DisplayerDidMount, this);
         ProjectorDisplayer.instance = this;
         console.log("[Projector plugin] init displayer done");
     }

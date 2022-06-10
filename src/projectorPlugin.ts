@@ -8,28 +8,21 @@ import type {
 import {
     InvisiblePlugin,
     isPlayer,
-    isRoom,
+    isRoom as _isRoom,
 } from "white-web-sdk";
 import { ProjectorDisplayer } from "./projectorDisplayer";
 import { waitUntil } from "./util";
 import type { SyncEvent } from "@netless/slide";
 import { Slide, SLIDE_EVENTS } from "@netless/slide";
 import { EventEmitter2 } from "eventemitter2";
+import type { ProjectorOption} from "./projectorSlideManager";
+import { ProjectorSlideManager } from "./projectorSlideManager";
 
-export type ProjectorPluginOption = {
-    logger?: Logger;
-    callback?: ProjectorCallback;
-    enableClickToNextStep?: boolean;
-}
-export type Logger = {
-    readonly info: (...messages: any[]) => void;
-    readonly warn: (...messages: any[]) => void;
-    readonly error: (...messages: any[]) => void;
+type SlideStore = {
+    [uuid: string]: ProjectorSlideManager,
 }
 
-export type ProjectorCallback = {
-    errorCallback: (e: Error) => void;
-}
+
 export enum ProjectorEvents {
     DisplayerDidMount = "DisplayerDidMount",
     EnableClick = "EnableClick",
@@ -38,8 +31,9 @@ export enum ProjectorEvents {
     SetParentContainerRect = "SetParentContainerRect",
 }
 
-type ProjectorState = {
-    slideState: any,
+type ProjectorStateStore = {
+    [uuid: string]: any,
+    currentSlide?: string,
 }
 
 type EventPayload = {
@@ -47,7 +41,14 @@ type EventPayload = {
     payload: SyncEvent,
 }
 
+const isRoom = _isRoom as (displayer: Displayer) => displayer is Room;
+
 export declare type WhiteboardEventListener = (event: Event)=>void;
+
+// TODO plugin 目前全局只能有一个 ppt，这种设计下，当用户翻到非 ppt 页会有两种策略：1.销毁状态 2.保留状态
+// 1. 销毁：当用户翻页到 /init，状态销毁，再翻页回来，用户需要重新初始化 ppt，但是笔迹仍然是原来的；当用户直接翻页到其他 ppt 路径，用户需要删除当前 ppt 对象，再初始化另一个 ppt 对象
+// 2. 保留：当用户从 ppt1 翻页到 /init，用户刷新，会
+
 
 // ProjectorPlugin 由于是垫在白板底部，在设计上一页只能有一个，全局唯一，所以切换 ppt 需要卸载掉 slide 然后重建
 // ProjectorPlugin 在创建后本身不会被销毁
@@ -60,17 +61,17 @@ export declare type WhiteboardEventListener = (event: Event)=>void;
 //  6. ppt 监听 slide 的状态变化更新到 globalstate 中
 //  7. 提供 clean 方法，移除事件监听，删除 slide 对象，但是可以再次 init
 
-export class ProjectorPlugin extends InvisiblePlugin<ProjectorState> {
+export class ProjectorPlugin extends InvisiblePlugin<ProjectorStateStore> {
 
+    private slideStore: SlideStore = {};
+    private currentSlideUUID?: string;
     // 组件类型，该组件的唯一识别符。应该取一个独特的名字，以和其他组件区分。
     static readonly kind: string = "projector-plugin";
     private static readonly scenePrefix: string = "projector-plugin";
     // 全局锁，由于用户白板切页和刚进入房间都会触发 roomstatechange 回调，无法判断用户是刚进入房间还是翻页，有可能触发两次初始化 ppt
     private static initializingSlideLock = false;
-    // 装白板和 ppt 容器的dom，需要这个元素的宽高来计算缩放时的偏移
-    private containerDomRect: DOMRect | null = null;
-    private static height: number;
-    private static width: number;
+    public slide?: Slide;
+    public static emitter: EventEmitter2 = new EventEmitter2();
 
     private logger: Logger = {
         info: console.log,
@@ -82,43 +83,61 @@ export class ProjectorPlugin extends InvisiblePlugin<ProjectorState> {
     };
     private enableClickToNextStep = false;
 
-    public static slide: Slide | undefined;
-    public static emitter: EventEmitter2 = new EventEmitter2();
-    
-    public getSlide(): Slide | undefined {return ProjectorPlugin.slide};
+    public getSlide(): Slide | undefined {return this.slide};
 
-    constructor(context: InvisiblePluginContext, option?: ProjectorPluginOption) {
-        super(context);
-        if (option?.logger) {
-            this.logger = option.logger;
-        }
-        if (option?.callback) {
-            this.projectorCallbacks = option.callback;
-        }
-        if (option?.enableClickToNextStep) {
-            this.enableClickToNextStep = option.enableClickToNextStep;
-        }
-
-        this.displayer.callbacks.on(this.callbackName as any, this.roomStateChangeListener);
-        this.displayer.addMagixEventListener(SLIDE_EVENTS.syncDispatch, this.whiteboardEventListener, {
-            fireSelfEventAfterCommit: true,
-        });
-        ProjectorPlugin.emitter.once(ProjectorEvents.DisplayerDidMount, this.wrapperDidMountListener);
-        ProjectorPlugin.emitter.on(ProjectorEvents.SetParentContainerRect, rect => {
-            this.containerDomRect = rect;
-        });
-    }
-
-    // pluginDisplayer 元素挂载可能比 plugin 本身要完，所以确保挂载后再设置一次属性
+    // pluginDisplayer 元素挂载可能比 plugin 本身要晚，所以确保挂载后再设置一次属性
     private wrapperDidMountListener = () => {
         this.onApplianceChange();
     };
 
-    /**
-     * @param displayer room object
-     * @param slideIndex render specified index
-     */
-    public async initSlide(displayer: Displayer, uuid: string, prefix: string, slideIndex?: number): Promise<void> {
+    public async initSlide(displayer: Displayer): Promise<ProjectorPlugin> {
+        // 获取插件实例
+        let projectorPlugin = displayer.getInvisiblePlugin(ProjectorPlugin.kind) as
+            | ProjectorPlugin
+            | undefined;
+        if (!projectorPlugin) {
+            if (isRoom(displayer) && displayer.isWritable) {
+                if (!displayer.isWritable) {
+                    displayer
+                    throw new Error("room is not writable");
+                }
+                projectorPlugin = (await displayer.createInvisiblePlugin(
+                    ProjectorPlugin,
+                    {}
+                )) as ProjectorPlugin;
+            } else {
+                throw new Error("[Projector plugin] plugin only working on writable room")
+            }
+        }
+        this.displayer.addMagixEventListener(SLIDE_EVENTS.syncDispatch, this.whiteboardEventListener, {
+            fireSelfEventAfterCommit: true,
+        });
+        ProjectorPlugin.emitter.once(ProjectorEvents.DisplayerDidMount, this.wrapperDidMountListener);
+        return projectorPlugin;
+    }
+
+    private createSlide(option: ProjectorOption): ProjectorSlideManager {
+        if (this.slideStore[option.uuid]) {
+            return this.slideStore[option.uuid];
+        } else {
+            return new ProjectorSlideManager(this, option);
+        }
+        const {uuid, prefix, slideIndex, logger, callback, enableClickToNextStep} = option;
+        if (logger) {
+            this.logger = logger;
+        }
+        if (callback) {
+            this.projectorCallbacks = callback;
+        }
+        if (enableClickToNextStep) {
+            this.enableClickToNextStep = enableClickToNextStep;
+        }
+
+        this.displayer.addMagixEventListener(SLIDE_EVENTS.syncDispatch, this.whiteboardEventListener, {
+            fireSelfEventAfterCommit: true,
+        });
+        ProjectorPlugin.emitter.once(ProjectorEvents.DisplayerDidMount, this.wrapperDidMountListener);
+
         if (ProjectorPlugin.initializingSlideLock) {
             this.logger.info("[Projector plugin] slide is initializing")
             return;
@@ -129,13 +148,6 @@ export class ProjectorPlugin extends InvisiblePlugin<ProjectorState> {
             this.logger.info("[Projector plugin] slide hase been initialized")
             return;
         }
-        
-        // 删除旧 slide
-        this.unmountSlide();
-
-        let projectorPlugin = displayer.getInvisiblePlugin(ProjectorPlugin.kind) as
-            | ProjectorPlugin
-            | undefined;
         if (!projectorPlugin) {
             if (isRoom(displayer) && (displayer as Room).isWritable) {
                 projectorPlugin = (await (displayer as Room).createInvisiblePlugin(
@@ -162,19 +174,13 @@ export class ProjectorPlugin extends InvisiblePlugin<ProjectorState> {
             slide.on(SLIDE_EVENTS.stateChange, this.onStateChange);
             slide.on(SLIDE_EVENTS.slideChange, this.onSlideChange);
             slide.on(SLIDE_EVENTS.syncDispatch, this.onSlideEventDispatch);
-            if (this.attributes.slideState) {
-                slide.setSlideState(this.attributes.slideState);
-            }
-            if (slideIndex !== undefined) {
-                slide.renderSlide(slideIndex);
-            }
+
             ProjectorPlugin.slide = slide;
-            ProjectorPlugin.emitter.emit(ProjectorEvents.UpdateParentContainerRect);
             this.logger.info("[Projector plugin] init slide done");
-        }).then(() => {
+            return slide;
+        }).then((slide: Slide) => {
             this.logger.info(`[Projector plugin] start load ppt, uuid: ${uuid}, prefix: ${prefix}`);
-            this.loadPPT(projectorPlugin!, uuid, prefix);
-            
+            this.loadPPT(slide, projectorPlugin!, uuid, prefix, slideIndex);
         }).finally(() => {
             ProjectorPlugin.initializingSlideLock = false;
         });
@@ -198,10 +204,14 @@ export class ProjectorPlugin extends InvisiblePlugin<ProjectorState> {
      * received event from whiteboard
      */
     private whiteboardEventListener: WhiteboardEventListener = ev => {
+        if (!this.currentSlideUUID) {
+            // ppt 还没初始化
+            return;
+        }
         const { type, payload } = ev.payload;
         if (type === SLIDE_EVENTS.syncDispatch) {
             this.logger.info(`[projector pluin]: received event `);
-            ProjectorPlugin.slide?.emit(SLIDE_EVENTS.syncReceive, payload);
+            this.slideStore[this.currentSlideUUID].slide.emit(SLIDE_EVENTS.syncReceive, payload);
         }
     };
 
@@ -247,8 +257,8 @@ export class ProjectorPlugin extends InvisiblePlugin<ProjectorState> {
      * 用户必须保证在从非 ppt 页切到 ppt 页时调用 initSlide 来设置好 uuid 和 prefix
      */
     private roomStateChangeListener = (state: RoomState) => {
+        console.log("wb change ", state.cameraState);
         if (state.cameraState) {
-            ProjectorPlugin.emitter.emit(ProjectorEvents.UpdateParentContainerRect);
             this.computedStyle(state);
         }
         // 用户修改了教具会触发
@@ -283,19 +293,12 @@ export class ProjectorPlugin extends InvisiblePlugin<ProjectorState> {
     }
 
     private computedStyle(state: DisplayerState): void {
-        const cameraState = state.cameraState;
         if (ProjectorDisplayer.instance) {
-            const {width, height, scale, centerX, centerY} = cameraState;
-            
-            const rootRect = this.containerDomRect || { x: 0, y: 0 }
-            const transformOriginX = `${(width / 2) + rootRect.x}px`;
-            const transformOriginY = `${(height / 2) + rootRect.y}px`;
-            const transformOrigin = `${transformOriginX} ${transformOriginY}`;
-            // 用 ppt 的原始宽高计算两个中心点经过缩放后的偏移
-            const iframeXDiff = ((width - ProjectorPlugin.width) / 2) * scale;
-            const iframeYDiff = ((height - ProjectorPlugin.height) / 2) * scale;
-            const x = - (centerX * scale) + iframeXDiff;
-            const y = - (centerY * scale) + iframeYDiff;
+            const {scale, centerX, centerY} = state.cameraState;
+            // 由于 ppt 和白板中点已经对齐，这里缩放中心就是中点
+            const transformOrigin = `center`;
+            const x = - (centerX * scale);
+            const y = - (centerY * scale);
             if (ProjectorDisplayer.instance?.containerRef) {
                 ProjectorDisplayer.instance.containerRef.style.transformOrigin = transformOrigin;
                 ProjectorDisplayer.instance.containerRef.style.transform = `translate(${x}px,${y}px) scale(${scale}, ${scale})`;
@@ -319,7 +322,10 @@ export class ProjectorPlugin extends InvisiblePlugin<ProjectorState> {
         return currentApplianceName === "clicker";
     }
 
+    // 如果切走了就清空一切状态
     private unmountSlide(): void {
+        this.displayer.callbacks.off(this.callbackName as any, this.roomStateChangeListener);
+        this.setAttributes({slideState: undefined});
         if (ProjectorPlugin.slide) {
             this.logger.info(`[Projector plugin] unmount slide object`);
             ProjectorPlugin.slide.clearSlideCache();
@@ -333,43 +339,61 @@ export class ProjectorPlugin extends InvisiblePlugin<ProjectorState> {
      * 通过 ppt 转换任务的 taskId 加载 ppt
      * @param uuid
      */
-    private async loadPPT(projectorPlugin: ProjectorPlugin, uuid: string, prefix: string): Promise<void> {
-        if (!ProjectorPlugin.slide) {
-            this.projectorCallbacks.errorCallback(new Error("[Projector plugin] you must initiate slide first"));
-            return;
-        } else {
-            // 先读取房间原有状态，如果有状态那么以房间内的状态为准，如果 state 没有 index 那么就渲染第一页
-            if (projectorPlugin.attributes && projectorPlugin.attributes.slideState!= undefined) {
-                // 如果是中途加入需要读取房间内的插件属性
-                await this.loadPPTByAttributes(ProjectorPlugin.slide, projectorPlugin.attributes.slideState);
-            } else {
-                ProjectorPlugin.slide.setResource(uuid, prefix);
-                await this.setSlideSize(ProjectorPlugin.slide);
-                // 第一次创建 ppt 需要创建每一页对应的 scene
-                await this.initWhiteboardScenes(uuid, ProjectorPlugin.slide);
-                ProjectorPlugin.slide.renderSlide(1, true);
-                projectorPlugin.setAttributes({
-                    slideState: ProjectorPlugin.slide.slideState
-                });
+    private async loadPPT(slide: Slide, projectorPlugin: ProjectorPlugin, uuid: string, prefix: string, slideIndex?: number): Promise<void> {
+        // 先读取房间原有状态，如果有状态那么以房间内的状态为准，如果没有那么就渲染第一页
+        if (projectorPlugin.attributes?.slideState) {
+            // 如果是中途加入需要读取房间内的插件属性
+            await this.loadPPTByAttributes(slide, projectorPlugin.attributes.slideState);
+            if (slideIndex !== undefined) {
+                slide.renderSlide(slideIndex);
             }
-            this.logger.info(`[Projector plugin] load ppt done, uuid: ${uuid}, prefix: ${prefix}`);
+        } else {
+            slide.setResource(uuid, prefix);
+            // 第一次创建 ppt 需要创建每一页对应的 scene
+            await this.initWhiteboardScenes(uuid, slide);
+            slide.renderSlide(1, true);
+            projectorPlugin.setAttributes({
+                slideState: slide.slideState
+            });
         }
+        this.logger.info(`[Projector plugin] load ppt done, uuid: ${uuid}, prefix: ${prefix}`);
     }
 
-    private async setSlideSize(slide: Slide): Promise<void> {
+    private async setSlideAndWhiteboardSize(slide: Slide): Promise<void> {
         const [width, height] = await slide.getSizeAsync();
-        console.log(width, height);
-        ProjectorPlugin.width = width;
-        ProjectorPlugin.height = height;
-        this.computedStyle(this.displayer.state);
+        console.log("---> ", width, height);
+        ProjectorDisplayer.instance!.containerRef!.style.width = `${width}px`;
+        ProjectorDisplayer.instance!.containerRef!.style.height = `${height}px`;
+        this.alignWhiteboardAndSlide(width, height);
+    }
+
+    private alignWhiteboardAndSlide(slideWidth: number, slideHeight: number) {
+        this.displayer.moveCamera({
+            centerX: 0,
+            centerY: 0,
+            scale: 1,
+        });
+        // 将白板缩放与 ppt 缩放绑定
+        this.displayer.callbacks.on(this.callbackName as any, this.roomStateChangeListener);
+       
+        // 调整白板至与 ppt 尺寸一致，并对准中心，同时占满整个页面
+        this.displayer.moveCameraToContain({
+            originX: 0,
+            originY: 0,
+            width: slideWidth,
+            height: slideHeight,
+        });
+        this.displayer.moveCamera({
+            centerX: 0,
+            centerY: 0,
+        });
     }
 
     private async loadPPTByAttributes(slide: Slide, slideState: any) {
         this.logger.info(`[Projector plugin] load by slide state: ${JSON.stringify(slideState)}`);
-        const room = (this.displayer as Room);
-        room.setScenePath(`/${ProjectorPlugin.scenePrefix}/${slideState.taskId}/${slideState.currentSlideIndex}`);
-        slide.setSlideState(slideState);
-        await this.setSlideSize(slide);
+        await slide.setSlideState(slideState);
+        
+        await this.setSlideAndWhiteboardSize(slide);
     }
 
     private async initWhiteboardScenes(uuid: string, slide: Slide): Promise<void> {

@@ -25,31 +25,24 @@ async function main(): Promise<void> {
   const room = await (roomUUID && roomToken
     ? joinRoom(roomUUID, roomToken)
     : createRoom());
+    
   (window as any).room = room;
   
   document.getElementById("btn")!.onclick = async () => {
-    let plugin = room.getInvisiblePlugin(ProjectorPlugin.kind) as
-    | ProjectorPlugin
-    | undefined;
-    if (!plugin) {
-      // 该插件全局应该只有一个
-      const projectorPlugin = new ProjectorPlugin({ kind: ProjectorPlugin.kind, displayer: room}, {
-        logger: {
-          info: console.log,
-          error: console.error,
-          warn: console.warn,
-        }, 
-        callback: {
-          errorCallback: (e: Error) => console.error(`catch ${e.stack}`)
-        },
-        enableClickToNextStep: true,
-      });
-      plugin = projectorPlugin;
-    }
-    await plugin.initSlide(room, devTaskUUID, devTaskPrefix);
-    (window as any).projector = plugin;
+    // 该插件全局应该只有一个
+    const projectorPlugin = await ProjectorPlugin.getInstance(room);
+    projectorPlugin.init();
+
+    await projectorPlugin.createSlide({
+      uuid: devTaskUUID,
+      prefix: devTaskPrefix,
+      slideIndex: 3,
+      enableClickToNextStep: true
+    });
+    
+    (window as any).projector = projectorPlugin;
   
-    bindKey(plugin);
+    bindKey(projectorPlugin);
   }
 
   const appDiv = document.getElementById("app")

@@ -1,59 +1,52 @@
+import type { SyncEvent} from "@netless/slide";
 import { Slide, SLIDE_EVENTS, waitUntil } from "@netless/slide";
-import type { Displayer, Room, RoomState} from "white-web-sdk";
+import type { Displayer, DisplayerState, Room, RoomState} from "white-web-sdk";
 import {  isRoom as _isRoom } from "white-web-sdk";
 import { ProjectorDisplayer } from "./projectorDisplayer";
+import type { Logger, ProjectorCallback } from "./projectorPlugin";
 import { ProjectorPlugin } from "./projectorPlugin";
 
-export type ProjectorCallback = {
-    errorCallback: (e: Error) => void;
+type EventPayload = {
+    type: string,
+    payload: SyncEvent,
 }
-export type ProjectorOption = {
+
+export type ProjectorSlideOption = {
     uuid: string,
     prefix: string,
     slideIndex?: number,
-    logger?: Logger;
-    callback?: ProjectorCallback;
     enableClickToNextStep?: boolean;
-}
-export type Logger = {
-    readonly info: (...messages: any[]) => void;
-    readonly warn: (...messages: any[]) => void;
-    readonly error: (...messages: any[]) => void;
 }
 
 const isRoom = _isRoom as (displayer: Displayer) => displayer is Room;
 
 export class ProjectorSlideManager {
-    private logger: Logger = {
-        info: console.log,
-        warn: console.warn,
-        error: console.error,
-    };
-    private projectorCallbacks: ProjectorCallback =  {
-        errorCallback: (e: Error) => {console.error(e)}
-    };
     private enableClickToNextStep = false;
     public slide: Slide | undefined;
-    private context: ProjectorPlugin;
+
+    private slideState: any;  // 不需要读取 slideState 中的内容，也不需要监听变化，只存储，在恢复页面的时候读取状态
+    private context: any;
+    private option: ProjectorSlideOption;
 
     // context 持有 plugin 会不会导致内存问题或者引用问题？
-    constructor(context: ProjectorPlugin, option: ProjectorOption) {
-        this.context = context;
-        const {uuid, prefix, slideIndex, logger, callback, enableClickToNextStep} = option;
-        if (logger) {
-            this.logger = logger;
-        }
-        if (callback) {
-            this.projectorCallbacks = callback;
-        }
+    // manager 创建后一定要有一个 slide 实例并且有 state 后，才会存入 store，从 store 读取的 manager 可以保证一定有 state
+    constructor( option: ProjectorSlideOption) {
+        // TODO 恢复 contxt
+        this.context = {} as any;
+        const {uuid, prefix, slideIndex, enableClickToNextStep} = option;
+        this.option = option;
         if (enableClickToNextStep) {
             this.enableClickToNextStep = enableClickToNextStep;
         }
+    }
 
-        waitUntil(() => {
+    public async initSlide(): Promise<Slide> {
+        return waitUntil(() => {
             return !!ProjectorDisplayer.instance && !!ProjectorDisplayer.instance!.containerRef;
         }, 10000).then(() => {
-            // 开始直接构造 slide 对象，当切换 ppt 时要保证先 destroy 原来的 slide 对象再 new 出来
+            if (this.slide) {
+                return this.slide;
+            }
             const slide = new Slide({
                 anchor: ProjectorDisplayer.instance!.containerRef!,
                 interactive: true,
@@ -66,17 +59,38 @@ export class ProjectorSlideManager {
             slide.on(SLIDE_EVENTS.syncDispatch, this.onSlideEventDispatch);
 
             this.slide = slide;
-            this.logger.info("[Projector plugin] init slide done");
-            return slide;
-        }).then((slide: Slide) => {
-            this.logger.info(`[Projector plugin] start load ppt, uuid: ${uuid}, prefix: ${prefix}`);
-            this.loadPPT(slide, uuid, prefix, slideIndex);
+            ProjectorPlugin.logger.info("[Projector plugin] init slide done");
+            return this.slide;
         });
     }
 
-    private onStateChange(): void {}
-    private onSlideChange(): void {}
-    private onSlideEventDispatch(): void {}
+    private onStateChange(state: any): void {
+        ProjectorPlugin.logger.info("[Projector plugin]: local state changed");
+        if (isRoom(this.context.displayer) && (this.context.displayer as Room).isWritable) {
+            this.slideState = state;
+            this.context.setAttributes({[this.slideState.taskId]: this});
+        }
+    }
+
+    private onSlideChange(index: number): void {
+        ProjectorPlugin.logger.info(`[ProjecloadPPTByAttributestor plugin] slide change to ${index}`);
+        if (isRoom(this.context.displayer) && (this.context.displayer as Room).isWritable) {
+            const scenePath = `/${ProjectorPlugin.kind}/${this.slideState.taskId}/${index}`;
+
+            ProjectorPlugin.logger.info(`[Projector plugin] scenePath change to ${scenePath}`);
+            (this.context.displayer as Room).setScenePath(scenePath);
+        }
+    }
+    private onSlideEventDispatch(event: SyncEvent): void {
+        if (isRoom(this.context.displayer) && (this.context.displayer as Room).isWritable) {
+            const payload: EventPayload = {
+                type: SLIDE_EVENTS.syncDispatch,
+                payload: event,
+            };
+            ProjectorPlugin.logger.info("[Projector plugin] dispatch: ", JSON.stringify(event));
+            (this.context.displayer as Room).dispatchMagixEvent(SLIDE_EVENTS.syncDispatch, payload);
+        }
+    }
 
     /**
      * 通过 ppt 转换任务的 taskId 加载 ppt
@@ -95,16 +109,13 @@ export class ProjectorSlideManager {
             // 第一次创建 ppt 需要创建每一页对应的 scene
             await this.initWhiteboardScenes(uuid, slide);
             slide.renderSlide(1, true);
-            this.context.setAttributes({
-                [uuid]: slide.slideState,
-                currentSlide: uuid,
-            });
+            // TODO 每次更新 slidestate 的时候要调用更新 attribute 的方法
         }
-        this.logger.info(`[Projector plugin] load ppt done, uuid: ${uuid}, prefix: ${prefix}`);
+        ProjectorPlugin.logger.info(`[Projector plugin] load ppt done, uuid: ${uuid}, prefix: ${prefix}`);
     }
 
     private async loadPPTByAttributes(slide: Slide, slideState: any) {
-        this.logger.info(`[Projector plugin] load by slide state: ${JSON.stringify(slideState)}`);
+        ProjectorPlugin.logger.info(`[Projector plugin] load by slide state: ${JSON.stringify(slideState)}`);
         await slide.setSlideState(slideState);
         
         await this.setSlideAndWhiteboardSize(slide);
@@ -155,32 +166,7 @@ export class ProjectorSlideManager {
         }
         // 用户修改了教具会触发
         if (state.memberState) {
-            this.onApplianceChange();
-        }
-        if (state.sceneState) {
-            this.logger.info(`[Projector plugin] scene changed ${state.sceneState.scenePath}`);
-            
-            if (!state.sceneState.scenePath.startsWith(`/${ProjectorPlugin.scenePrefix}`)) {
-                this.unmountSlide();
-            } else if (state.sceneState.scenePath !== `/${ProjectorPlugin.scenePrefix}/${ProjectorPlugin.slide?.slideState.taskId}/${ProjectorPlugin.slide?.slideState.currentSlideIndex}`) {
-                const slideIndex = state.sceneState.scenePath.split("/")[3];
-                // uuid、 prefix 可能不对，因此从 slide state 中读取的可能不是同一个 ppt 的内容，这点需要用户来保证
-                if (ProjectorPlugin.slide) {
-                    ProjectorPlugin.slide?.renderSlide(parseInt(slideIndex));
-                } else {
-                    // 从没有 ppt 的页面切换到了 ppt 页，需要重新初始化 ppt
-                    const projectorPlugin = this.displayer.getInvisiblePlugin(ProjectorPlugin.kind) as ProjectorPlugin
-                    
-                    if (projectorPlugin.attributes && projectorPlugin.attributes.slideState) {
-                        // 从 slide state 中恢复 ppt
-                        this.logger.info("[Projector plugin] restore slide by attributes");
-                        this.initSlide(this.displayer, projectorPlugin.attributes.slideState.taskId, projectorPlugin.attributes.slideState.url)
-                    } else {
-                        // 没有找到状态，无法恢复，需要用户手动调用 initslide
-                        this.projectorCallbacks.errorCallback(new Error("[Projector plugin] can not find slide state, you must initiate slide first"));
-                    }
-                }
-            }
+            // this.onApplianceChange();
         }
     }
 
@@ -207,9 +193,38 @@ export class ProjectorSlideManager {
                     name: `${index}`,
                 };
             });
-            this.logger.info(`[Projector plugin] create new scenes`);
+            ProjectorPlugin.logger.info(`[Projector plugin] create new scenes`);
             room.putScenes(`/${ProjectorPlugin.kind}/${uuid}`, scenes);
         }
         // 回放房间不用初始化场景
+    }
+
+    public nextStep():void {
+        this.slide?.nextStep();
+    }
+
+    public prevStep():void {
+        this.slide?.prevStep();
+    }
+
+    public destory(): void {
+        // TODO
+        this.slide?.destroy();
+    }
+
+    public renderSlide(index: number): void {
+        if (this.slide) {
+            this.slide.renderSlide(index);
+        } else {
+            throw new Error("Projector plugin] can not find slide object in renderSlide");
+        }
+    };
+
+    public async getSlideCount(): Promise<number> {
+        if (this.slide) {
+            return await this.slide.getSlideCountAsync();
+        } else {
+            throw new Error("Projector plugin] can not find slide object in getSlideCount");
+        }
     }
 }

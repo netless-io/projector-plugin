@@ -292,7 +292,7 @@ export class ProjectorPlugin extends InvisiblePlugin<ProjectorStateStore> {
             slideManager = (this.attributes[option.uuid] as ProjectorSlideManager);
         } else {
             // TODO 恢复 context
-            slideManager = new ProjectorSlideManager( option);
+            slideManager = new ProjectorSlideManager(this, option);
         }
         await slideManager.initSlide();
         console.log("create done", option.uuid, this.attributes[option.uuid], slideManager);

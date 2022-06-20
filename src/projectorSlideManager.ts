@@ -18,26 +18,53 @@ export type ProjectorSlideOption = {
     enableClickToNextStep?: boolean;
 }
 
+export type SlideManagerStatus = ProjectorSlideOption & {
+    slideState: any
+}
+
 const isRoom = _isRoom as (displayer: Displayer) => displayer is Room;
 
 export class ProjectorSlideManager {
     private enableClickToNextStep = false;
     public slide: Slide | undefined;
 
-    private slideState: any;  // 不需要读取 slideState 中的内容，也不需要监听变化，只存储，在恢复页面的时候读取状态
-    private context: any;
+    private _slideState: any;  // 不需要读取 slideState 中的内容，也不需要监听变化，只存储，在恢复页面的时候读取状态
+    private context: ProjectorPlugin;
     private option: ProjectorSlideOption;
 
     // context 持有 plugin 会不会导致内存问题或者引用问题？
     // manager 创建后一定要有一个 slide 实例并且有 state 后，才会存入 store，从 store 读取的 manager 可以保证一定有 state
-    constructor( option: ProjectorSlideOption) {
+    constructor(context: ProjectorPlugin, option: ProjectorSlideOption) {
         // TODO 恢复 contxt
-        this.context = {} as any;
+        this.context = context;
         const {uuid, prefix, slideIndex, enableClickToNextStep} = option;
         this.option = option;
         if (enableClickToNextStep) {
             this.enableClickToNextStep = enableClickToNextStep;
         }
+    }
+
+    get slideManagerConsturctorParams(): SlideManagerStatus {
+        // slideIndex 根据恢复时的 scene 决定
+        return {
+            uuid: this.option.uuid,
+            prefix: this.option.prefix,
+            enableClickToNextStep: this.enableClickToNextStep,
+            slideState: this._slideState
+        };
+    }
+
+    public static async getInstanceBySlideState(context: ProjectorPlugin, slideManagerStatus: SlideManagerStatus, slideIndex: number): ProjectorSlideManager {
+        const manager = new ProjectorSlideManager(context, {
+            uuid: slideManagerStatus.uuid,
+            prefix: slideManagerStatus.prefix,
+            enableClickToNextStep: slideManagerStatus.enableClickToNextStep,
+            slideIndex: slideIndex,
+        });
+
+        await manager.initSlide();
+        manager.setSlideState(slideManagerStatus.slideState);
+        return manager;
     }
 
     public async initSlide(): Promise<Slide> {
@@ -64,18 +91,27 @@ export class ProjectorSlideManager {
         });
     }
 
+    private setSlideState(slideState: any) {
+        if (this.slide) {
+            this.slide.setSlideState(slideState);
+        } else {
+            throw new Error("Projector plugin] can not find slide object in setSlideState");
+        }
+        
+    }
+
     private onStateChange(state: any): void {
         ProjectorPlugin.logger.info("[Projector plugin]: local state changed");
         if (isRoom(this.context.displayer) && (this.context.displayer as Room).isWritable) {
-            this.slideState = state;
-            this.context.setAttributes({[this.slideState.taskId]: this});
+            this._slideState = state;
+            this.context.setAttributes({[this._slideState.taskId]: this});
         }
     }
 
     private onSlideChange(index: number): void {
         ProjectorPlugin.logger.info(`[ProjecloadPPTByAttributestor plugin] slide change to ${index}`);
         if (isRoom(this.context.displayer) && (this.context.displayer as Room).isWritable) {
-            const scenePath = `/${ProjectorPlugin.kind}/${this.slideState.taskId}/${index}`;
+            const scenePath = `/${ProjectorPlugin.kind}/${this._slideState.taskId}/${index}`;
 
             ProjectorPlugin.logger.info(`[Projector plugin] scenePath change to ${scenePath}`);
             (this.context.displayer as Room).setScenePath(scenePath);
@@ -185,6 +221,7 @@ export class ProjectorSlideManager {
     }
 
     private async initWhiteboardScenes(uuid: string, slide: Slide): Promise<void> {
+        slide.hasNextStep();
         const slideCount = await slide.getSlideCountAsync();
         if (isRoom(this.context.displayer)) {
             const room = this.context.displayer;

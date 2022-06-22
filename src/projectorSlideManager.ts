@@ -19,6 +19,7 @@ export type ProjectorSlideOption = {
 }
 
 export type SlideManagerStatus = ProjectorSlideOption & {
+    slideCount: number,
     slideState: any
 }
 
@@ -32,79 +33,26 @@ export class ProjectorSlideManager {
     private context: ProjectorPlugin;
     private option: ProjectorSlideOption;
 
-    // context 持有 plugin 会不会导致内存问题或者引用问题？
     // manager 创建后一定要有一个 slide 实例并且有 state 后，才会存入 store，从 store 读取的 manager 可以保证一定有 state
     constructor(context: ProjectorPlugin, option: ProjectorSlideOption) {
         // TODO 恢复 contxt
         this.context = context;
-        const {uuid, prefix, slideIndex, enableClickToNextStep} = option;
+        const {uuid, prefix, enableClickToNextStep} = option;
         this.option = option;
         if (enableClickToNextStep) {
             this.enableClickToNextStep = enableClickToNextStep;
         }
     }
 
-    get slideManagerConsturctorParams(): SlideManagerStatus {
-        // slideIndex 根据恢复时的 scene 决定
-        return {
-            uuid: this.option.uuid,
-            prefix: this.option.prefix,
-            enableClickToNextStep: this.enableClickToNextStep,
-            slideState: this._slideState
-        };
-    }
-
-    public static async getInstanceBySlideState(context: ProjectorPlugin, slideManagerStatus: SlideManagerStatus, slideIndex: number): ProjectorSlideManager {
-        const manager = new ProjectorSlideManager(context, {
-            uuid: slideManagerStatus.uuid,
-            prefix: slideManagerStatus.prefix,
-            enableClickToNextStep: slideManagerStatus.enableClickToNextStep,
-            slideIndex: slideIndex,
-        });
-
-        await manager.initSlide();
-        manager.setSlideState(slideManagerStatus.slideState);
-        return manager;
-    }
-
-    public async initSlide(): Promise<Slide> {
-        return waitUntil(() => {
-            return !!ProjectorDisplayer.instance && !!ProjectorDisplayer.instance!.containerRef;
-        }, 10000).then(() => {
-            if (this.slide) {
-                return this.slide;
-            }
-            const slide = new Slide({
-                anchor: ProjectorDisplayer.instance!.containerRef!,
-                interactive: true,
-                mode: "interactive",    // 模式固定
-                enableGlobalClick: this.enableClickToNextStep,
-                resize: true,
-            });
-            slide.on(SLIDE_EVENTS.stateChange, this.onStateChange);
-            slide.on(SLIDE_EVENTS.slideChange, this.onSlideChange);
-            slide.on(SLIDE_EVENTS.syncDispatch, this.onSlideEventDispatch);
-
-            this.slide = slide;
-            ProjectorPlugin.logger.info("[Projector plugin] init slide done");
-            return this.slide;
-        });
-    }
-
     private setSlideState(slideState: any) {
-        if (this.slide) {
-            this.slide.setSlideState(slideState);
-        } else {
-            throw new Error("Projector plugin] can not find slide object in setSlideState");
-        }
-        
+        this.getSlideObj().setSlideState(slideState);
     }
 
     private onStateChange(state: any): void {
         ProjectorPlugin.logger.info("[Projector plugin]: local state changed");
         if (isRoom(this.context.displayer) && (this.context.displayer as Room).isWritable) {
             this._slideState = state;
-            this.context.setAttributes({[this._slideState.taskId]: this});
+            this.context.setAttributes({[this._slideState.taskId]: this._slideState});
         }
     }
 
@@ -236,6 +184,14 @@ export class ProjectorSlideManager {
         // 回放房间不用初始化场景
     }
 
+    private getSlideObj(): Slide {
+        if (this.slide) {
+            return this.slide;
+        } else {
+            throw new Error(`Projector plugin] can not find slide object`);
+        }
+    }
+
     public nextStep():void {
         this.slide?.nextStep();
     }
@@ -247,21 +203,59 @@ export class ProjectorSlideManager {
     public destory(): void {
         // TODO
         this.slide?.destroy();
+        this.slide = undefined;
     }
 
     public renderSlide(index: number): void {
-        if (this.slide) {
-            this.slide.renderSlide(index);
-        } else {
-            throw new Error("Projector plugin] can not find slide object in renderSlide");
-        }
+        this.getSlideObj().renderSlide(index);
     };
 
     public async getSlideCount(): Promise<number> {
-        if (this.slide) {
-            return await this.slide.getSlideCountAsync();
-        } else {
-            throw new Error("Projector plugin] can not find slide object in getSlideCount");
-        }
+        return await this.getSlideObj().getSlideCountAsync();
+    }
+
+    public static async getInstanceByManagerState(context: ProjectorPlugin, slideManagerStatus: SlideManagerStatus): Promise<ProjectorSlideManager> {
+        const manager = new ProjectorSlideManager(context, {
+            uuid: slideManagerStatus.uuid,
+            prefix: slideManagerStatus.prefix,
+            enableClickToNextStep: slideManagerStatus.enableClickToNextStep,
+        });
+
+        await manager.initSlide();
+        // TODO 分开写  最后看需不需要提取
+        manager.setResource(slideManagerStatus.uuid, slideManagerStatus.prefix);
+        return manager;
+    }
+
+    public async initSlide(): Promise<Slide> {
+        return waitUntil(() => {
+            return !!ProjectorDisplayer.instance && !!ProjectorDisplayer.instance!.containerRef;
+        }, 10000).then(() => {
+            if (this.slide) {
+                return this.slide;
+            }
+            const slide = new Slide({
+                anchor: ProjectorDisplayer.instance!.containerRef!,
+                interactive: true,
+                mode: "interactive",    // 模式固定
+                enableGlobalClick: this.enableClickToNextStep,
+                resize: true,
+            });
+            slide.on(SLIDE_EVENTS.stateChange, this.onStateChange);
+            slide.on(SLIDE_EVENTS.slideChange, this.onSlideChange);
+            slide.on(SLIDE_EVENTS.syncDispatch, this.onSlideEventDispatch);
+
+            this.slide = slide;
+            ProjectorPlugin.logger.info("[Projector plugin] init slide done");
+            return this.slide;
+        });
+    }
+
+    public setResource(taskId: string, prefix: string): void {
+        this.getSlideObj().setResource(taskId, prefix);
+    }
+
+    public getSlideState(): any {
+        return this.getSlideObj().slideState;
     }
 }

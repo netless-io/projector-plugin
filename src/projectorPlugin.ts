@@ -15,7 +15,7 @@ import { waitUntil } from "./util";
 import type { SyncEvent , Slide} from "@netless/slide";
 import { SLIDE_EVENTS } from "@netless/slide";
 import { EventEmitter2 } from "eventemitter2";
-import type { ProjectorSlideOption} from "./projectorSlideManager";
+import type { ProjectorSlideOption, SlideManagerStatus} from "./projectorSlideManager";
 import { ProjectorSlideManager } from "./projectorSlideManager";
 
 export type Logger = {
@@ -41,7 +41,7 @@ export enum ProjectorEvents {
 }
 
 type ProjectorStateStore = {
-    [uuid: string]: ProjectorSlideManager,
+    [uuid: string]: SlideManagerStatus,
 }
 
 const isRoom = _isRoom as (displayer: Displayer) => displayer is Room;
@@ -65,7 +65,7 @@ export class ProjectorPlugin extends InvisiblePlugin<ProjectorStateStore> {
         errorCallback: (e: Error) => {console.error(e)}
     };
 
-    public static currentSlideManagerId?: string;
+    public static currentSlideManager?: ProjectorSlideManager;
     
     // pluginDisplayer 元素挂载可能比 plugin 本身要晚，所以确保挂载后再设置一次属性
     private wrapperDidMountListener = () => {
@@ -76,14 +76,15 @@ export class ProjectorPlugin extends InvisiblePlugin<ProjectorStateStore> {
      * received event from whiteboard
      */
      private whiteboardEventListener: WhiteboardEventListener = ev => {
-        if (!ProjectorPlugin.currentSlideManagerId) {
+        if (!ProjectorPlugin.currentSlideManager) {
             // ppt 还没初始化
             return;
         }
         const { type, payload } = ev.payload;
         if (type === SLIDE_EVENTS.syncDispatch) {
+            // 如果本地 slide 没有先切换完成，可能造成不同步？不会，如果先下一步，再切换 ppt，那么 ppt 初始化时会拉取快照，一样会同步
             ProjectorPlugin.logger.info(`[projector pluin]: received event `);
-            this.getManagerInstance().slide!.emit(SLIDE_EVENTS.syncReceive, payload);
+            ProjectorPlugin.currentSlideManager.slide?.emit(SLIDE_EVENTS.syncReceive, payload);
         }
     };
 
@@ -122,7 +123,7 @@ export class ProjectorPlugin extends InvisiblePlugin<ProjectorStateStore> {
                 const slideIndex = state.sceneState.scenePath.split("/")[3];
                 const slideManager = this.attributes[uuid];
                 if (slideManager) {
-                    ProjectorPlugin.currentSlideManagerId = uuid;
+                    ProjectorPlugin.currentSlideManager = uuid;
                     slideManager.renderSlide(parseInt(slideIndex));
                 } else {
                     // 创建 slide 的时候是先 设置 manager 再 setscene，不应该读取不到
@@ -165,11 +166,11 @@ export class ProjectorPlugin extends InvisiblePlugin<ProjectorStateStore> {
     // 如果切走了就清空一切状态
     private unmountSlide(): void {
         this.displayer.callbacks.off(this.callbackName as any, this.roomStateChangeListener);
-        if (ProjectorPlugin.currentSlideManagerId) {
+        if (ProjectorPlugin.currentSlideManager) {
             ProjectorPlugin.logger.info(`[Projector plugin] unmount slide object`);
-            this.getManagerInstance().destory();
+            ProjectorPlugin.currentSlideManager.destory();
 
-            ProjectorPlugin.currentSlideManagerId = undefined;
+            ProjectorPlugin.currentSlideManager = undefined;
         }
     }
 
@@ -235,13 +236,11 @@ export class ProjectorPlugin extends InvisiblePlugin<ProjectorStateStore> {
     }
 
     private getManagerInstance() {
-        if (ProjectorPlugin.currentSlideManagerId) {
-            const manager = this.attributes[ProjectorPlugin.currentSlideManagerId];
-            if (manager) {
-                return manager;
-            } 
+        if (ProjectorPlugin.currentSlideManager) {
+            return ProjectorPlugin.currentSlideManager;
+        } else {
+            throw new Error("[Projector plugin] can not find slideManager");
         }
-        throw new Error("[Projector plugin] can not find slideManager by currentSlideManagerId");
     }
 
     public static async getInstance(displayer: Displayer, adaptor?: ProjectorAdaptor): Promise<ProjectorPlugin> {
@@ -288,28 +287,40 @@ export class ProjectorPlugin extends InvisiblePlugin<ProjectorStateStore> {
     // 创建 ppt，只有主播会创建
     public async createSlide(option: ProjectorSlideOption): Promise<void> {
         let slideManager: ProjectorSlideManager;
+        let slideManagerStatus: SlideManagerStatus;
+        let slideIndex: number;
         if (this.attributes[option.uuid]) {
-            slideManager = (this.attributes[option.uuid] as ProjectorSlideManager);
+            slideManagerStatus = this.attributes[option.uuid];
+            slideManager = await ProjectorSlideManager.getInstanceByManagerState(this, slideManagerStatus);
+            slideIndex = slideManagerStatus.slideIndex || 1;
         } else {
-            // TODO 恢复 context
             slideManager = new ProjectorSlideManager(this, option);
+            await slideManager.initSlide();
+            slideManager.setResource(option.uuid, option.prefix);
+            const slideCount = await slideManager.getSlideCount();
+            slideManagerStatus = {
+                uuid: option.uuid,
+                prefix: option.prefix,
+                enableClickToNextStep: option.enableClickToNextStep,
+                slideIndex: 1,
+                slideCount,
+                slideState: undefined,
+            }
+            slideIndex = 1;
+            this.setAttributes({
+                [option.uuid]: slideManagerStatus,
+            });
         }
-        await slideManager.initSlide();
-        console.log("create done", option.uuid, this.attributes[option.uuid], slideManager);
+        ProjectorPlugin.currentSlideManager = slideManager;
+        console.log("create done", option.uuid, this.attributes[option.uuid]);
         
-        // TODO 循环引用？
-        this.setAttributes({
-            [option.uuid]: slideManager,
-        });
-        console.log("set done");
-        const slideCount = await slideManager.getSlideCount();
-        await this.putWhiteboardScenes(option.uuid, slideCount);
+        await this.putWhiteboardScenes(option.uuid, slideManagerStatus.slideCount);
         
-        await this.jumpToScene(option.uuid, slideCount, option.slideIndex);
+        await this.jumpToScene(option.uuid, slideManagerStatus.slideCount, slideIndex);
     }
 
     public setInteractivable(interactivable: boolean): void {
-        const slide = this.getManagerInstance().slide;
+        const slide = ProjectorPlugin.currentSlideManager?.slide;
         if (slide) {
             slide.setInteractive(interactivable);
         } else {

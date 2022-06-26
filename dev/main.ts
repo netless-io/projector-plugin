@@ -31,18 +31,29 @@ async function main(): Promise<void> {
   document.getElementById("btn")!.onclick = async () => {
     // 该插件全局应该只有一个
     const projectorPlugin = await ProjectorPlugin.getInstance(room);
-    projectorPlugin.init();
 
     await projectorPlugin.createSlide({
       uuid: devTaskUUID,
       prefix: devTaskPrefix,
-      slideIndex: 3,
-      enableClickToNextStep: true
     });
     
     (window as any).projector = projectorPlugin;
   
     bindKey(projectorPlugin);
+  }
+  document.getElementById("btn2")!.onclick = async () => {
+    const attributes = room.getInvisiblePlugin("projector-plugin")?.attributes;
+    console.log("attributes ", attributes);
+    
+    if (attributes) {
+      const attr: any = {};
+      Object.keys(attributes).forEach(key => {
+          attr[key] = undefined;
+      });
+      console.log("clean ", attr);
+      room.getInvisiblePlugin("projector-plugin")?.setAttributes({...attr});
+    }
+    
   }
 
   const appDiv = document.getElementById("app")

@@ -3,7 +3,6 @@ import { Slide, SLIDE_EVENTS, waitUntil } from "@netless/slide";
 import type { Displayer, DisplayerState, Room, RoomState} from "white-web-sdk";
 import {  isRoom as _isRoom } from "white-web-sdk";
 import { ProjectorDisplayer } from "./projectorDisplayer";
-import type { Logger, ProjectorCallback } from "./projectorPlugin";
 import { ProjectorPlugin } from "./projectorPlugin";
 
 type EventPayload = {
@@ -11,44 +10,26 @@ type EventPayload = {
     payload: SyncEvent,
 }
 
-export type ProjectorSlideOption = {
-    uuid: string,
-    prefix: string,
-    slideIndex?: number,
-    enableClickToNextStep?: boolean;
+export type SlideState = {
+    taskId: string,
+    url: string,
+    currentSlideIndex: number,
 }
-
-export type SlideManagerStatus = ProjectorSlideOption & {
-    slideCount: number,
-    slideState: any
-}
-
 const isRoom = _isRoom as (displayer: Displayer) => displayer is Room;
 
+// TODO scenepath 以 slidestate 为准，仅有操作 ppt 的人可以切换 slide 页面，其余接受方如果发现 slideindex 与 scenepath 不一致，则以 slidestate 为准，不能操作 scenepath
 export class ProjectorSlideManager {
-    private enableClickToNextStep = false;
-    public slide: Slide | undefined;
 
     private _slideState: any;  // 不需要读取 slideState 中的内容，也不需要监听变化，只存储，在恢复页面的时候读取状态
     private context: ProjectorPlugin;
-    private option: ProjectorSlideOption;
+    public slide: Slide | undefined;
 
     // manager 创建后一定要有一个 slide 实例并且有 state 后，才会存入 store，从 store 读取的 manager 可以保证一定有 state
-    constructor(context: ProjectorPlugin, option: ProjectorSlideOption) {
-        // TODO 恢复 contxt
+    constructor(context: ProjectorPlugin) {
         this.context = context;
-        const {uuid, prefix, enableClickToNextStep} = option;
-        this.option = option;
-        if (enableClickToNextStep) {
-            this.enableClickToNextStep = enableClickToNextStep;
-        }
     }
 
-    private setSlideState(slideState: any) {
-        this.getSlideObj().setSlideState(slideState);
-    }
-
-    private onStateChange(state: any): void {
+    private onStateChange = (state: any): void => {
         ProjectorPlugin.logger.info("[Projector plugin]: local state changed");
         if (isRoom(this.context.displayer) && (this.context.displayer as Room).isWritable) {
             this._slideState = state;
@@ -56,8 +37,9 @@ export class ProjectorSlideManager {
         }
     }
 
-    private onSlideChange(index: number): void {
+    private onSlideChange = (index: number): void => {
         ProjectorPlugin.logger.info(`[ProjecloadPPTByAttributestor plugin] slide change to ${index}`);
+        console.log({...this.context.attributes});
         if (isRoom(this.context.displayer) && (this.context.displayer as Room).isWritable) {
             const scenePath = `/${ProjectorPlugin.kind}/${this._slideState.taskId}/${index}`;
 
@@ -65,7 +47,7 @@ export class ProjectorSlideManager {
             (this.context.displayer as Room).setScenePath(scenePath);
         }
     }
-    private onSlideEventDispatch(event: SyncEvent): void {
+    private onSlideEventDispatch = (event: SyncEvent): void => {
         if (isRoom(this.context.displayer) && (this.context.displayer as Room).isWritable) {
             const payload: EventPayload = {
                 type: SLIDE_EVENTS.syncDispatch,
@@ -74,28 +56,6 @@ export class ProjectorSlideManager {
             ProjectorPlugin.logger.info("[Projector plugin] dispatch: ", JSON.stringify(event));
             (this.context.displayer as Room).dispatchMagixEvent(SLIDE_EVENTS.syncDispatch, payload);
         }
-    }
-
-    /**
-     * 通过 ppt 转换任务的 taskId 加载 ppt
-     * @param uuid
-     */
-    private async loadPPT(slide: Slide, uuid: string, prefix: string, slideIndex?: number): Promise<void> {
-        // 先读取房间原有状态，如果有状态那么以房间内的状态为准，如果没有那么就渲染第一页
-        if (this.context.attributes?.[uuid]) {
-            // 如果是中途加入需要读取房间内的插件属性
-            await this.loadPPTByAttributes(slide, this.context.attributes[uuid]);
-            if (slideIndex !== undefined) {
-                slide.renderSlide(slideIndex);
-            }
-        } else {
-            slide.setResource(uuid, prefix);
-            // 第一次创建 ppt 需要创建每一页对应的 scene
-            await this.initWhiteboardScenes(uuid, slide);
-            slide.renderSlide(1, true);
-            // TODO 每次更新 slidestate 的时候要调用更新 attribute 的方法
-        }
-        ProjectorPlugin.logger.info(`[Projector plugin] load ppt done, uuid: ${uuid}, prefix: ${prefix}`);
     }
 
     private async loadPPTByAttributes(slide: Slide, slideState: any) {
@@ -168,22 +128,6 @@ export class ProjectorSlideManager {
         }
     }
 
-    private async initWhiteboardScenes(uuid: string, slide: Slide): Promise<void> {
-        slide.hasNextStep();
-        const slideCount = await slide.getSlideCountAsync();
-        if (isRoom(this.context.displayer)) {
-            const room = this.context.displayer;
-            const scenes = new Array(slideCount).fill('').map((_, index) => {
-                return {
-                    name: `${index}`,
-                };
-            });
-            ProjectorPlugin.logger.info(`[Projector plugin] create new scenes`);
-            room.putScenes(`/${ProjectorPlugin.kind}/${uuid}`, scenes);
-        }
-        // 回放房间不用初始化场景
-    }
-
     private getSlideObj(): Slide {
         if (this.slide) {
             return this.slide;
@@ -201,7 +145,6 @@ export class ProjectorSlideManager {
     }
 
     public destory(): void {
-        // TODO
         this.slide?.destroy();
         this.slide = undefined;
     }
@@ -214,20 +157,7 @@ export class ProjectorSlideManager {
         return await this.getSlideObj().getSlideCountAsync();
     }
 
-    public static async getInstanceByManagerState(context: ProjectorPlugin, slideManagerStatus: SlideManagerStatus): Promise<ProjectorSlideManager> {
-        const manager = new ProjectorSlideManager(context, {
-            uuid: slideManagerStatus.uuid,
-            prefix: slideManagerStatus.prefix,
-            enableClickToNextStep: slideManagerStatus.enableClickToNextStep,
-        });
-
-        await manager.initSlide();
-        // TODO 分开写  最后看需不需要提取
-        manager.setResource(slideManagerStatus.uuid, slideManagerStatus.prefix);
-        return manager;
-    }
-
-    public async initSlide(): Promise<Slide> {
+    public initSlide = async(): Promise<Slide> => {
         return waitUntil(() => {
             return !!ProjectorDisplayer.instance && !!ProjectorDisplayer.instance!.containerRef;
         }, 10000).then(() => {
@@ -238,8 +168,8 @@ export class ProjectorSlideManager {
                 anchor: ProjectorDisplayer.instance!.containerRef!,
                 interactive: true,
                 mode: "interactive",    // 模式固定
-                enableGlobalClick: this.enableClickToNextStep,
                 resize: true,
+                // TODO navigatorDelegate 是否 setstate 也会触发？
             });
             slide.on(SLIDE_EVENTS.stateChange, this.onStateChange);
             slide.on(SLIDE_EVENTS.slideChange, this.onSlideChange);
@@ -255,7 +185,11 @@ export class ProjectorSlideManager {
         this.getSlideObj().setResource(taskId, prefix);
     }
 
-    public getSlideState(): any {
+    public async setSlideState(slideState: any): Promise<void> {
+        await this.getSlideObj().setSlideState(slideState);
+    }
+
+    public getSlideState(): SlideState {
         return this.getSlideObj().slideState;
     }
 }

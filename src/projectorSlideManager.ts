@@ -39,10 +39,10 @@ export class ProjectorSlideManager {
 
     private onSlideChange = (index: number): void => {
         ProjectorPlugin.logger.info(`[ProjecloadPPTByAttributestor plugin] slide change to ${index}`);
-        console.log({...this.context.attributes});
+        console.log({...this.context.attributes}, {...this._slideState});
         if (isRoom(this.context.displayer) && (this.context.displayer as Room).isWritable) {
-            const scenePath = `/${ProjectorPlugin.kind}/${this._slideState.taskId}/${index}`;
-
+            const scenePath = `/${ProjectorPlugin.kind}/${this.slide?.slideState.taskId}/${index}`;
+            
             ProjectorPlugin.logger.info(`[Projector plugin] scenePath change to ${scenePath}`);
             (this.context.displayer as Room).setScenePath(scenePath);
         }
@@ -164,6 +164,8 @@ export class ProjectorSlideManager {
             if (this.slide) {
                 return this.slide;
             }
+            console.log("ProjectorDisplayer.instance ", ProjectorDisplayer.instance);
+            
             const slide = new Slide({
                 anchor: ProjectorDisplayer.instance!.containerRef!,
                 interactive: true,

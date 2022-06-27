@@ -27,20 +27,23 @@ async function main(): Promise<void> {
     : createRoom());
     
   (window as any).room = room;
-  
-  document.getElementById("btn")!.onclick = async () => {
-    // 该插件全局应该只有一个
-    const projectorPlugin = await ProjectorPlugin.getInstance(room);
+  const appDiv = document.getElementById("app")
+  if (appDiv) {
+    room.bindHtmlElement(appDiv as HTMLDivElement);
+  }
+  // 该插件全局应该只有一个
+  const projectorPlugin = await ProjectorPlugin.getInstance(room);
 
+  (window as any).projector = projectorPlugin;
+  bindKey(projectorPlugin);
+
+  document.getElementById("btn")!.onclick = async () => {
     await projectorPlugin.createSlide({
       uuid: devTaskUUID,
       prefix: devTaskPrefix,
     });
-    
-    (window as any).projector = projectorPlugin;
-  
-    bindKey(projectorPlugin);
   }
+  
   document.getElementById("btn2")!.onclick = async () => {
     const attributes = room.getInvisiblePlugin("projector-plugin")?.attributes;
     console.log("attributes ", attributes);
@@ -54,11 +57,6 @@ async function main(): Promise<void> {
       room.getInvisiblePlugin("projector-plugin")?.setAttributes({...attr});
     }
     
-  }
-
-  const appDiv = document.getElementById("app")
-  if (appDiv) {
-    room.bindHtmlElement(appDiv as HTMLDivElement);
   }
 }
 

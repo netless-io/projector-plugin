@@ -59,6 +59,8 @@ export declare type WhiteboardEventListener = (event: Event)=>void;
 export class ProjectorPlugin extends InvisiblePlugin<ProjectorStateStore> {
     // 组件类型，该组件的唯一识别符。应该取一个独特的名字，以和其他组件区分。
     static readonly kind: string = "projector-plugin";
+    // 场景路径，用于判断是否是从 ppt 切走或者切回来
+    static scenePath: string | undefined;
     public static emitter: EventEmitter2 = new EventEmitter2();
 
     public static logger: Logger = {
@@ -116,7 +118,7 @@ export class ProjectorPlugin extends InvisiblePlugin<ProjectorStateStore> {
      * 用户必须保证在从非 ppt 页切到 ppt 页时调用 initSlide 来设置好 uuid 和 prefix
      */
     private roomStateChangeListener = async (state: RoomState) => {
-        console.log("change ", {...state});
+        console.log("room change ", {...state}, this.displayer.state.sceneState.scenePath, ProjectorPlugin.scenePath);
         
         if (state.cameraState) {
             console.log("camera change");
@@ -131,27 +133,38 @@ export class ProjectorPlugin extends InvisiblePlugin<ProjectorStateStore> {
             ProjectorPlugin.logger.info(`[Projector plugin] scene changed ${state.sceneState.scenePath}`);
             
             if (!state.sceneState.scenePath.startsWith(`/${ProjectorPlugin.kind}`)) {
-                this.unmountSlide();
+                if (ProjectorPlugin.scenePath && ProjectorPlugin.scenePath.startsWith(`/${ProjectorPlugin.kind}`)) {
+                    // 只有从 ppt 切到非 ppt 时才需要 unmount
+                    this.unmountSlide();
+                }
             } else {
                 const uuid = state.sceneState.scenePath.split("/")[2];
                 const slideIndex = state.sceneState.scenePath.split("/")[3];
-                if (ProjectorPlugin.currentSlideManager) {
-                    const slideState = ProjectorPlugin.currentSlideManager.getSlideState();
+                const currentSlideUUID = this.attributes["currentSlideUUID"];
+                if (currentSlideUUID) {
+                    const slideState = this.attributes[currentSlideUUID] as SlideState;
                     if (slideState.taskId !== uuid || slideState.currentSlideIndex !== parseInt(slideIndex)) {
                         // scenePath 与 slideState 对不上，以 slidestate 为准
                         await this.restoreSlideByState(slideState);
                     }
+                } else {
+                    throw new Error("[Projector plugin] slide state not initiated");
                 }
             }
+            ProjectorPlugin.scenePath = state.sceneState.scenePath;
         }
     }
 
+    // 恢复 slide，如果 currentSlideUUID 不存在则证明 slide 没有初始化
     private restoreSlideByState = async (slideState: SlideState): Promise<void> => {
+        ProjectorPlugin.logger.info(`[Projector plugin] restore slide by state ${JSON.stringify(slideState)}}`);
+        
         if (!ProjectorPlugin.currentSlideManager) {
             ProjectorPlugin.currentSlideManager = new ProjectorSlideManager(this);
             await ProjectorPlugin.currentSlideManager.initSlide();
         }
         ProjectorPlugin.currentSlideManager.setResource(slideState.taskId, slideState.url);
+        ProjectorPlugin.currentSlideManager.setSlideState(slideState);
         if (isRoom(this.displayer) && this.displayer.isWritable) {
             const scenePath = `/${ProjectorPlugin.kind}/${slideState.taskId}/${slideState.currentSlideIndex}`;
 
@@ -266,7 +279,9 @@ export class ProjectorPlugin extends InvisiblePlugin<ProjectorStateStore> {
         }
     }
 
-    private init = (): void => {
+    public init = async (): Promise<void> => {
+        const scenePath = this.displayer.state.sceneState.scenePath;
+        ProjectorPlugin.scenePath = scenePath;
         // 这两个监听应该在初始化的时候
         this.displayer.addMagixEventListener(SLIDE_EVENTS.syncDispatch, this.whiteboardEventListener, {
             fireSelfEventAfterCommit: true,
@@ -276,6 +291,17 @@ export class ProjectorPlugin extends InvisiblePlugin<ProjectorStateStore> {
         this.displayer.callbacks.on(this.callbackName as any, this.roomStateChangeListener);
         
         this.onApplianceChange();
+        
+        // 如果用户是中途加入房间，由于 roomStateChangeListener 无法监听到刚进入房间时的 scenepath 变化，因此如果刚进入房间时是 ppt 页面，就尝试通过 currentSlideUUID 恢复，然后跳转
+        if (scenePath.startsWith(`/${ProjectorPlugin.kind}`)) {
+            const currentSlideUUID = this.attributes["currentSlideUUID"];
+            if (currentSlideUUID) {
+                const slideState = this.attributes[currentSlideUUID] as SlideState;
+                await this.restoreSlideByState(slideState);
+            } else {
+                throw new Error("[Projector plugin] current slide not initiated");
+            }
+        }
     }
 
     public static async getInstance(displayer: Displayer, adaptor?: ProjectorAdaptor): Promise<ProjectorPlugin> {
@@ -293,8 +319,7 @@ export class ProjectorPlugin extends InvisiblePlugin<ProjectorStateStore> {
         if (!projectorPlugin) {
             if (isRoom(displayer) && displayer.isWritable) {
                 if (!displayer.isWritable) {
-                    displayer
-                    throw new Error("room is not writable");
+                    throw new Error("[Projector plugin] room is not writable");
                 }
                 projectorPlugin = (await displayer.createInvisiblePlugin(
                     ProjectorPlugin,
@@ -304,7 +329,7 @@ export class ProjectorPlugin extends InvisiblePlugin<ProjectorStateStore> {
                 throw new Error("[Projector plugin] plugin only working on writable room")
             }
         }
-        projectorPlugin.init();
+        await projectorPlugin.init();
         return projectorPlugin;
     }
 

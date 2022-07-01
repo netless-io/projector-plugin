@@ -1,6 +1,6 @@
 import type { SyncEvent} from "@netless/slide";
 import { Slide, SLIDE_EVENTS, waitUntil } from "@netless/slide";
-import type { Displayer, DisplayerState, Room, RoomState} from "white-web-sdk";
+import type { Displayer, DisplayerState, Room} from "white-web-sdk";
 import {  isRoom as _isRoom } from "white-web-sdk";
 import { ProjectorDisplayer } from "./projectorDisplayer";
 import { ProjectorPlugin } from "./projectorPlugin";
@@ -17,12 +17,13 @@ export type SlideState = {
 }
 const isRoom = _isRoom as (displayer: Displayer) => displayer is Room;
 
-// TODO scenepath 以 slidestate 为准，仅有操作 ppt 的人可以切换 slide 页面，其余接受方如果发现 slideindex 与 scenepath 不一致，则以 slidestate 为准，不能操作 scenepath
 export class ProjectorSlideManager {
 
     private _slideState: any;  // 不需要读取 slideState 中的内容，也不需要监听变化，只存储，在恢复页面的时候读取状态
     private context: ProjectorPlugin;
     public slide: Slide | undefined;
+    public slideWidth: number | undefined;
+    public slideHeight: number | undefined;
 
     // manager 创建后一定要有一个 slide 实例并且有 state 后，才会存入 store，从 store 读取的 manager 可以保证一定有 state
     constructor(context: ProjectorPlugin) {
@@ -58,17 +59,8 @@ export class ProjectorSlideManager {
         }
     }
 
-    private async loadPPTByAttributes(slide: Slide, slideState: any) {
-        ProjectorPlugin.logger.info(`[Projector plugin] load by slide state: ${JSON.stringify(slideState)}`);
-        await slide.setSlideState(slideState);
-        
-        await this.setSlideAndWhiteboardSize(slide);
-    }
-
     private async setSlideAndWhiteboardSize(slide: Slide): Promise<void> {
         const [width, height] = await slide.getSizeAsync();
-        ProjectorDisplayer.instance!.containerRef!.style.width = `${width}px`;
-        ProjectorDisplayer.instance!.containerRef!.style.height = `${height}px`;
         this.alignWhiteboardAndSlide(width, height);
     }
 
@@ -78,8 +70,6 @@ export class ProjectorSlideManager {
             centerY: 0,
             scale: 1,
         });
-        // 将白板缩放与 ppt 缩放绑定
-        this.context.displayer.callbacks.on(this.callbackName as any, this.roomStateChangeListener);
        
         // 调整白板至与 ppt 尺寸一致，并对准中心，同时占满整个页面
         this.context.displayer.moveCameraToContain({
@@ -94,27 +84,7 @@ export class ProjectorSlideManager {
         });
     }
 
-    private get callbackName(): string {
-        return !isRoom(this.context.displayer) ? "onPlayerStateChanged" : "onRoomStateChanged";
-    }
-
-    /**
-     * 1. change slide index when whiteboard scene changed
-     * 2. unmount slide when scene change to non-slide scene
-     * 3. restore slide when scene change from non-slide scene to slide scene
-     * 用户必须保证在从非 ppt 页切到 ppt 页时调用 initSlide 来设置好 uuid 和 prefix
-     */
-     private roomStateChangeListener = (state: RoomState) => {
-        if (state.cameraState) {
-            this.computedStyle(state);
-        }
-        // 用户修改了教具会触发
-        if (state.memberState) {
-            // this.onApplianceChange();
-        }
-    }
-
-    private computedStyle(state: DisplayerState): void {
+    public computedStyle(state: DisplayerState): void {
         if (ProjectorDisplayer.instance) {
             const {scale, centerX, centerY} = state.cameraState;
             // 由于 ppt 和白板中点已经对齐，这里缩放中心就是中点
@@ -123,7 +93,11 @@ export class ProjectorSlideManager {
             const y = - (centerY * scale);
             if (ProjectorDisplayer.instance?.containerRef) {
                 ProjectorDisplayer.instance.containerRef.style.transformOrigin = transformOrigin;
-                ProjectorDisplayer.instance.containerRef.style.transform = `translate(${x}px,${y}px) scale(${scale}, ${scale})`;
+                ProjectorDisplayer.instance.containerRef.style.transform = `translate(${x}px,${y}px) scale(1, 1)`;
+                if (this.slideWidth && this.slideHeight) {
+                    ProjectorDisplayer.instance.containerRef.style.width = `${this.slideWidth * scale}px`;
+                    ProjectorDisplayer.instance.containerRef.style.height = `${this.slideHeight * scale}px`;
+                }
             }
         }
     }
@@ -149,7 +123,9 @@ export class ProjectorSlideManager {
         this.slide = undefined;
     }
 
-    public renderSlide(index: number): void {
+    public renderSlide = async(index: number): Promise<void> => {
+        console.log("call slide ernder");
+        await this.setSlideAndWhiteboardSize(this.getSlideObj());
         this.getSlideObj().renderSlide(index);
     };
 
@@ -178,16 +154,22 @@ export class ProjectorSlideManager {
             slide.on(SLIDE_EVENTS.syncDispatch, this.onSlideEventDispatch);
 
             this.slide = slide;
+            (window as any).slide = slide as any;
             ProjectorPlugin.logger.info("[Projector plugin] init slide done");
             return this.slide;
         });
     }
 
-    public setResource(taskId: string, prefix: string): void {
-        this.getSlideObj().setResource(taskId, prefix);
+    public setResource = async (taskId: string, prefix: string): Promise<void> => {
+        const slide = this.getSlideObj();
+        slide.setResource(taskId, prefix);
+        const [width, height] = await slide.getSizeAsync();
+        this.slideWidth = width;
+        this.slideHeight = height;
     }
 
-    public async setSlideState(slideState: any): Promise<void> {
+    public async setSlideState(slideState: SlideState): Promise<void> {
+        await this.setSlideAndWhiteboardSize(this.getSlideObj());
         await this.getSlideObj().setSlideState(slideState);
     }
 

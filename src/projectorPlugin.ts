@@ -10,7 +10,7 @@ import {
     isRoom as _isRoom,
 } from "white-web-sdk";
 import { ProjectorDisplayer } from "./projectorDisplayer";
-import { Slide, SLIDE_EVENTS } from "@netless/slide";
+import {  SLIDE_EVENTS } from "@netless/slide";
 import { EventEmitter2 } from "eventemitter2";
 import type { SlideState } from "./projectorSlideManager";
 import { ProjectorSlideManager } from "./projectorSlideManager";
@@ -72,11 +72,6 @@ export class ProjectorPlugin extends InvisiblePlugin<ProjectorStateStore> {
     };
 
     public static currentSlideManager?: ProjectorSlideManager;
-    
-    // pluginDisplayer 元素挂载可能比 plugin 本身要晚，所以确保挂载后再设置一次属性
-    private wrapperDidMountListener = () => {
-        this.onApplianceChange();
-    };
 
     onAttributesUpdate = async (attributes: ProjectorStateStore): Promise<void> => {
         if (attributes.currentSlideUUID) {
@@ -90,14 +85,13 @@ export class ProjectorPlugin extends InvisiblePlugin<ProjectorStateStore> {
     /**
      * received event from whiteboard
      */
-     private whiteboardEventListener: WhiteboardEventListener = ev => {
+    private whiteboardEventListener: WhiteboardEventListener = ev => {
         if (!ProjectorPlugin.currentSlideManager) {
-            // ppt 还没初始化
             return;
         }
         const { type, payload } = ev.payload;
         if (type === SLIDE_EVENTS.syncDispatch) {
-            ProjectorPlugin.logger.info(`[projector pluin]: received event `);
+            ProjectorPlugin.logger.info(`[projector pluin]: received event`);
             ProjectorPlugin.currentSlideManager.slide?.emit(SLIDE_EVENTS.syncReceive, payload);
         }
     };
@@ -116,7 +110,7 @@ export class ProjectorPlugin extends InvisiblePlugin<ProjectorStateStore> {
                 ProjectorPlugin.currentSlideManager.computedStyle(state);
             }
         }
-        // 用户修改了教具会触发
+        // triggerd when user change appliance
         if (state.memberState) {
             if (ProjectorDisplayer.instance) {
                 this.onApplianceChange();
@@ -127,25 +121,24 @@ export class ProjectorPlugin extends InvisiblePlugin<ProjectorStateStore> {
             
             if (!state.sceneState.scenePath.startsWith(`/${ProjectorPlugin.kind}`)) {
                 if (ProjectorPlugin._scenePath && ProjectorPlugin._scenePath.startsWith(`/${ProjectorPlugin.kind}`)) {
-                    // 只有从 ppt 切到非 ppt 时才需要 unmount
+                    // only unmount when change scene from slide scene to non-slide scene
                     this.unmountSlide();
                 }
             } else {
                 const uuid = state.sceneState.scenePath.split("/")[2];
                 const slideIndex = state.sceneState.scenePath.split("/")[3];
                 const currentSlideUUID = this.attributes["currentSlideUUID"];
-                console.log("currentSlideUUID ", currentSlideUUID, JSON.stringify(this.attributes[currentSlideUUID]));
                 
                 if (currentSlideUUID && this.attributes[currentSlideUUID]) {
                     const slideState = this.attributes[currentSlideUUID] as SlideState;
                     if (slideState.taskId !== uuid || slideState.currentSlideIndex !== parseInt(slideIndex)) {
-                        // scenePath 与 slideState 对不上，以 slidestate 为准
+                        // if data in scenePath not same with data in slideState, data in slidestate always prevail
                         await this.restoreSlideByState(slideState);
-                        // TODO 从非 ppt 页跳转到 ppt 页会卡在这一步
                     }
                 } else {
-                    // 当场景切换到 ppt 页时，如果没有读取到云端 slidestate 只可能是一种情况：某个用户刚好创建 slide，但是 slidestate 还没有更新到云端，这时候根据 index 先渲染
-                    // 由于已经进入了房间，可以监听到所有用户的事件，因此状态肯定可以同步
+                    // When the scene switches to the document page, if the cloud slidestate is not read, it may only be a situation:
+                    //  a user just created a slide, but the slidestate has not been updated to the cloud, then the page is rendered first according to the index
+                    //  and then the user has entered the room, the client can listen to the events of all users, so the state can definitely be synchronized
                     if (ProjectorPlugin.currentSlideManager) {
                         await ProjectorPlugin.currentSlideManager.renderSlide(parseInt(slideIndex));
                     }
@@ -156,7 +149,6 @@ export class ProjectorPlugin extends InvisiblePlugin<ProjectorStateStore> {
         }
     }
 
-    // 恢复 slide，如果 currentSlideUUID 不存在则证明 slide 没有初始化
     private restoreSlideByState = async (slideState: SlideState): Promise<void> => {
         ProjectorPlugin.logger.info(`[Projector plugin] restore slide by state ${JSON.stringify(slideState)}}`);
         
@@ -181,7 +173,6 @@ export class ProjectorPlugin extends InvisiblePlugin<ProjectorStateStore> {
         return this.isReplay ? "onPlayerStateChanged" : "onRoomStateChanged";
     }
 
-    // 只有点击教具才能触发 ppt 事件
     private canClick(): boolean {
         if (!(this.displayer as any).isWritable) {
             return false;
@@ -234,31 +225,6 @@ export class ProjectorPlugin extends InvisiblePlugin<ProjectorStateStore> {
         }
     }
 
-    public init = async (): Promise<void> => {
-        const scenePath = this.displayer.state.sceneState.scenePath;
-        ProjectorPlugin._scenePath = scenePath;
-        
-        this.displayer.addMagixEventListener(SLIDE_EVENTS.syncDispatch, this.whiteboardEventListener, {
-            fireSelfEventAfterCommit: true,
-        });
-        ProjectorPlugin._emitter.once(ProjectorEvents.DisplayerDidMount, this.wrapperDidMountListener);
-        this.displayer.callbacks.on(this.callbackName as any, this.roomStateChangeListener);
-        // ProjectorDisplayer is create before ProjectorPlugin instance，DisplayerDidMount callback may not be fired
-        // Call the method once to make sure the state is correct
-        this.onApplianceChange();
-        
-        // 如果用户是中途加入房间，由于 roomStateChangeListener 无法监听到刚进入房间时的 scenepath 变化，因此如果刚进入房间时是 ppt 页面，就尝试通过 currentSlideUUID 恢复，然后跳转
-        if (scenePath.startsWith(`/${ProjectorPlugin.kind}`)) {
-            const currentSlideUUID = this.attributes["currentSlideUUID"];
-            if (currentSlideUUID && this.attributes[currentSlideUUID]) {
-                const slideState = this.attributes[currentSlideUUID] as SlideState;
-                await this.restoreSlideByState(slideState);
-            } else {
-                throw new Error("[Projector plugin] current slide not initiated");
-            }
-        }
-    }
-
     public static async getInstance(displayer: Displayer, adaptor?: ProjectorAdaptor): Promise<ProjectorPlugin> {
         if (adaptor?.logger) {
             ProjectorPlugin.logger = adaptor.logger;
@@ -267,7 +233,6 @@ export class ProjectorPlugin extends InvisiblePlugin<ProjectorStateStore> {
             ProjectorPlugin.projectorCallbacks = adaptor?.callback;
         }
         
-        // 获取插件实例
         let projectorPlugin = displayer.getInvisiblePlugin(ProjectorPlugin.kind) as
             | ProjectorPlugin
             | undefined;
@@ -286,6 +251,35 @@ export class ProjectorPlugin extends InvisiblePlugin<ProjectorStateStore> {
         }
         await projectorPlugin.init();
         return projectorPlugin;
+    }
+
+    public init = async (): Promise<void> => {
+        const scenePath = this.displayer.state.sceneState.scenePath;
+        ProjectorPlugin._scenePath = scenePath;
+        
+        this.displayer.addMagixEventListener(SLIDE_EVENTS.syncDispatch, this.whiteboardEventListener, {
+            fireSelfEventAfterCommit: true,
+        });
+        ProjectorPlugin._emitter.once(ProjectorEvents.DisplayerDidMount, () => {
+            this.onApplianceChange();
+        });
+        this.displayer.callbacks.on(this.callbackName as any, this.roomStateChangeListener);
+        // ProjectorDisplayer is create before ProjectorPlugin instance，DisplayerDidMount callback may not be fired
+        // Call the method once to make sure the state is correct
+        this.onApplianceChange();
+        
+        // If the user joins the room in the middle, because the roomStateChangeListener cannot monitor the scenepath
+        // change when the room is just entered, if the ppt page is when the room is just entered, try to restore it 
+        // through currentSlideUUID, and then jump to that scene
+        if (scenePath.startsWith(`/${ProjectorPlugin.kind}`)) {
+            const currentSlideUUID = this.attributes["currentSlideUUID"];
+            if (currentSlideUUID && this.attributes[currentSlideUUID]) {
+                const slideState = this.attributes[currentSlideUUID] as SlideState;
+                await this.restoreSlideByState(slideState);
+            } else {
+                throw new Error("[Projector plugin] current slide not initiated");
+            }
+        }
     }
 
     /**
@@ -345,15 +339,6 @@ export class ProjectorPlugin extends InvisiblePlugin<ProjectorStateStore> {
         ProjectorPlugin.currentSlideManager = slideManager;
         ProjectorPlugin.logger.info(`[Projector plugin] refresh currentSlideManager object`);
         return ProjectorPlugin.currentSlideManager;
-    }
-
-    public setInteractivable(interactivable: boolean): void {
-        const slide = ProjectorPlugin.currentSlideManager?.slide;
-        if (slide) {
-            slide.setInteractive(interactivable);
-        } else {
-            ProjectorPlugin.logger.error(`[Projector plugin] slide does not initialized`);
-        }
     }
 
     public nextStep(): void {

@@ -16,13 +16,13 @@ export class ProjectorDisplayer extends React.Component<DisplayerProps, Displaye
         super(props);
         ProjectorPlugin._emitter.on(ProjectorEvents.EnableClick, () => {
             if (this.containerRef) {
-                console.log("enabel click");
+                ProjectorPlugin.logger.info("[Projector plugin] enabel click");
                 this.containerRef.style.pointerEvents = "auto";
             }
         });
         ProjectorPlugin._emitter.on(ProjectorEvents.DisableClick, () => {
             if (this.containerRef) {
-                console.log("disable click");
+                ProjectorPlugin.logger.info("[Projector plugin] disable click");
                 this.containerRef!.style.pointerEvents = "none";
             }
         });

@@ -19,13 +19,11 @@ const isRoom = _isRoom as (displayer: Displayer) => displayer is Room;
 
 export class ProjectorSlideManager {
 
-    private _slideState: any;  // 不需要读取 slideState 中的内容，也不需要监听变化，只存储，在恢复页面的时候读取状态
     private context: ProjectorPlugin;
     public slide: Slide | undefined;
     public slideWidth: number | undefined;
     public slideHeight: number | undefined;
 
-    // manager 创建后一定要有一个 slide 实例并且有 state 后，才会存入 store，从 store 读取的 manager 可以保证一定有 state
     constructor(context: ProjectorPlugin) {
         this.context = context;
     }
@@ -33,14 +31,12 @@ export class ProjectorSlideManager {
     private onStateChange = (state: any): void => {
         ProjectorPlugin.logger.info("[Projector plugin]: local state changed");
         if (isRoom(this.context.displayer) && (this.context.displayer as Room).isWritable) {
-            this._slideState = state;
-            this.context.setAttributes({[this._slideState.taskId]: this._slideState});
+            this.context.setAttributes({[state.taskId]: state});
         }
     }
 
     private onSlideChange = (index: number): void => {
         ProjectorPlugin.logger.info(`[ProjecloadPPTByAttributestor plugin] slide change to ${index}`);
-        console.log({...this.context.attributes}, {...this._slideState});
         if (isRoom(this.context.displayer) && (this.context.displayer as Room).isWritable) {
             const scenePath = `/${ProjectorPlugin.kind}/${this.slide?.slideState.taskId}/${index}`;
             
@@ -71,7 +67,8 @@ export class ProjectorSlideManager {
             scale: 1,
         });
        
-        // 调整白板至与 ppt 尺寸一致，并对准中心，同时占满整个页面
+        // Adjust the whiteboard to the same size as the ppt, align it to the center,
+        // and fill the entire page at the same time
         this.context.displayer.moveCameraToContain({
             originX: 0,
             originY: 0,
@@ -87,7 +84,7 @@ export class ProjectorSlideManager {
     public computedStyle(state: DisplayerState): void {
         if (ProjectorDisplayer.instance) {
             const {scale, centerX, centerY} = state.cameraState;
-            // 由于 ppt 和白板中点已经对齐，这里缩放中心就是中点
+            // The midpoints of the ppt and the whiteboard are aligned, zoom center is the midpoint
             const transformOrigin = `center`;
             const x = - (centerX * scale);
             const y = - (centerY * scale);
@@ -145,9 +142,8 @@ export class ProjectorSlideManager {
             const slide = new Slide({
                 anchor: ProjectorDisplayer.instance!.containerRef!,
                 interactive: true,
-                mode: "interactive",    // 模式固定
+                mode: "interactive",    // fixed
                 resize: true,
-                // TODO navigatorDelegate 是否 setstate 也会触发？
             });
             slide.on(SLIDE_EVENTS.stateChange, this.onStateChange);
             slide.on(SLIDE_EVENTS.slideChange, this.onSlideChange);

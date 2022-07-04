@@ -108,12 +108,16 @@ export class ProjectorPlugin extends InvisiblePlugin<ProjectorStateStore> {
         if (state.cameraState) {
             if (ProjectorPlugin.currentSlideManager) {
                 ProjectorPlugin.currentSlideManager.computedStyle(state);
+            } else {
+                ProjectorPlugin.logger.warn(`[projector pluin] currentSlideManager not ready`);
             }
         }
         // triggerd when user change appliance
         if (state.memberState) {
             if (ProjectorDisplayer.instance) {
                 this.onApplianceChange();
+            } else {
+                ProjectorPlugin.logger.warn(`[projector pluin] ProjectorDisplayer not ready`);
             }
         }
         if (state.sceneState) {
@@ -136,13 +140,14 @@ export class ProjectorPlugin extends InvisiblePlugin<ProjectorStateStore> {
                         await this.restoreSlideByState(slideState);
                     }
                 } else {
-                    // When the scene switches to the document page, if the cloud slidestate is not read, it may only be a situation:
+                    // When the scene switches to the slide page, if the cloud slidestate is not read, it may only be a situation:
                     //  a user just created a slide, but the slidestate has not been updated to the cloud, then the page is rendered first according to the index
                     //  and then the user has entered the room, the client can listen to the events of all users, so the state can definitely be synchronized
                     if (ProjectorPlugin.currentSlideManager) {
                         await ProjectorPlugin.currentSlideManager.renderSlide(parseInt(slideIndex));
+                    } else {
+                        ProjectorPlugin.logger.warn(`[projector pluin] currentSlideManager not ready`);
                     }
-                    // throw new Error("[Projector plugin] slide state not initiated");
                 }
             }
             ProjectorPlugin._scenePath = state.sceneState.scenePath;
@@ -226,7 +231,14 @@ export class ProjectorPlugin extends InvisiblePlugin<ProjectorStateStore> {
         }
     }
 
-    public static async getInstance(displayer: Displayer, adaptor?: ProjectorAdaptor): Promise<ProjectorPlugin> {
+    /**
+     * Throws an error when there is a problem
+     * You can not create slide scene by room.putScenes(), Otherwise, the initialization will fail
+     * Use createSlide() to create a slide and slide scenes
+     * 
+     * Return undefined if initialization failed
+     */ 
+    public static async getInstance(displayer: Displayer, adaptor?: ProjectorAdaptor): Promise<ProjectorPlugin | undefined> {
         if (adaptor?.logger) {
             ProjectorPlugin.logger = adaptor.logger;
         }
@@ -240,21 +252,23 @@ export class ProjectorPlugin extends InvisiblePlugin<ProjectorStateStore> {
         if (!projectorPlugin) {
             if (isRoom(displayer) && displayer.isWritable) {
                 if (!displayer.isWritable) {
-                    throw new ProjectorError("[Projector plugin] room is not writable", ProjectorErrorType.RuntimeError);
+                    ProjectorPlugin.projectorCallbacks.errorCallback(new ProjectorError("[Projector plugin] room is not writable", ProjectorErrorType.RuntimeError));
+                    return undefined;
                 }
                 projectorPlugin = (await displayer.createInvisiblePlugin(
                     ProjectorPlugin,
                     {}
                 )) as ProjectorPlugin;
             } else {
-                throw new ProjectorError("[Projector plugin] plugin only working on writable room", ProjectorErrorType.RuntimeError);
+                ProjectorPlugin.projectorCallbacks.errorCallback(new ProjectorError("[Projector plugin] plugin only working on writable room", ProjectorErrorType.RuntimeError));
+                return undefined;
             }
         }
         await projectorPlugin.init();
         return projectorPlugin;
     }
 
-    public init = async (): Promise<void> => {
+    private init = async (): Promise<void> => {
         const scenePath = this.displayer.state.sceneState.scenePath;
         ProjectorPlugin._scenePath = scenePath;
         
@@ -278,20 +292,20 @@ export class ProjectorPlugin extends InvisiblePlugin<ProjectorStateStore> {
                 const slideState = this.attributes[currentSlideUUID] as SlideState;
                 await this.restoreSlideByState(slideState);
             } else {
-                throw new ProjectorError("[Projector plugin] current slide not initiated", ProjectorErrorType.RuntimeError);
+                ProjectorPlugin.logger.warn("[Projector plugin] current slide not initiated", ProjectorErrorType.RuntimeError);
             }
         }
     }
 
     /**
-     * create a slide and jump to frist page.
+     * create a slide and slide scenes, then jump to frist slide page.
      * if the slide has already been created，it will clear whiteboard contents of the corresponding scnen
      * */ 
     public async createSlide(option: ProjectorSlideOption): Promise<void> {
         const slideManager = await this.refreshCurrentSlideManager(option.uuid, option.prefix);
         
-        const slideCount = await slideManager.getSlideCount();
-        await this.putWhiteboardScenes(option.uuid, slideCount);
+        const pageCount = await slideManager.getSlidePageCount();
+        await this.putWhiteboardScenes(option.uuid, pageCount);
         
         this.setAttributes({
             currentSlideUUID: option.uuid,
@@ -325,7 +339,7 @@ export class ProjectorPlugin extends InvisiblePlugin<ProjectorStateStore> {
             
             await this.jumpToScene(slideState.taskId, index);
         } else {
-            throw new Error("[Projector plugin] slide not created");
+            ProjectorPlugin.projectorCallbacks.errorCallback(new ProjectorError("[Projector plugin] slide not created", ProjectorErrorType.RuntimeError));
         }
     }
 
@@ -368,7 +382,7 @@ export class ProjectorPlugin extends InvisiblePlugin<ProjectorStateStore> {
      * return false if delete motion failed.
      * can not delete slide if current slide is target.
      */
-    public deleteSlide(uuid: string): boolean {
+    public deleteSlide = (uuid: string): boolean => {
         if (isRoom(this.displayer)) {
             const scenePathItem = this.displayer.state.sceneState.scenePath.split("/");
             const uuidInScenePath = scenePathItem[2];
@@ -378,7 +392,8 @@ export class ProjectorPlugin extends InvisiblePlugin<ProjectorStateStore> {
                 ProjectorPlugin.logger.error(`[Projector plugin] can not delete this slide because target is rendering`);
                 return false;
             } else {
-                this.displayer.removeScenes(`${ProjectorPlugin.kind}/${uuid}`);
+                console.log(`/${ProjectorPlugin.kind}/${uuid}`);
+                this.displayer.removeScenes(`/${ProjectorPlugin.kind}/${uuid}`);
                 this.setAttributes({
                     [uuid]: undefined
                 });
@@ -392,17 +407,18 @@ export class ProjectorPlugin extends InvisiblePlugin<ProjectorStateStore> {
 
     /**
      * List all tasks with first page preview
+     * make sure storage bucket allow cross domain with GET & HEAD request
      */
-    public async listSlidesWithPreview(): Promise<{
+    public listSlidesWithPreview = async (): Promise<{
         uuid: string,
         slidePreviewImage?: string
-    }[]> {
+    }[]> => {
         const keys = Object.keys(this.attributes);
         const currentSlideUUIDIndex = keys.indexOf("currentSlideUUID");
-        const uuidList = keys.splice(currentSlideUUIDIndex, 1);
+        keys.splice(currentSlideUUIDIndex, 1);
         const slides = [];
-        for (let index = 0; index < uuidList.length; index++) {
-            const uuid = uuidList[index];
+        for (let index = 0; index < keys.length; index++) {
+            const uuid = keys[index];
             const slideState = this.attributes[uuid] as SlideState;
             const slidePreviewImage = `${slideState.url}/${uuid}/preview/1.png`;
             const previewExist = await isFileExist(slidePreviewImage);
@@ -423,13 +439,13 @@ export class ProjectorPlugin extends InvisiblePlugin<ProjectorStateStore> {
     /**
      * List preview images of specified task
      */
-    public async listSlidePreviews(uuid: string): Promise<string[]> {
+    public listSlidePreviews = async (uuid: string): Promise<string[]> => {
         const previews: string[] = [];
         const slideState = this.attributes[uuid] as SlideState;
         if (slideState) {
             const slideCount = await getslideCount(uuid, slideState.url);
             for (let index = 0; index < slideCount; index++) {
-                const previewUrl = `${slideState.url}/${uuid}/preview/${index}.png`;
+                const previewUrl = `${slideState.url}/${uuid}/preview/${index + 1}.png`;
                 previews[index] = previewUrl;
             }
         } 

@@ -2,6 +2,7 @@ import type { SyncEvent} from "@netless/slide";
 import { Slide, SLIDE_EVENTS, waitUntil } from "@netless/slide";
 import type { Displayer, DisplayerState, Room} from "white-web-sdk";
 import {  isRoom as _isRoom } from "white-web-sdk";
+import { ProjectorError, ProjectorErrorType } from "./error";
 import { ProjectorDisplayer } from "./projectorDisplayer";
 import { ProjectorPlugin } from "./projectorPlugin";
 
@@ -99,11 +100,12 @@ export class ProjectorSlideManager {
         }
     }
 
-    private getSlideObj(): Slide {
+    private getSlideObj(): Slide | undefined {
         if (this.slide) {
             return this.slide;
         } else {
-            throw new Error(`Projector plugin] can not find slide object`);
+            ProjectorPlugin.projectorCallbacks.errorCallback(new ProjectorError(`Projector plugin] can not find slide object`, ProjectorErrorType.RuntimeError));
+            return undefined;
         }
     }
 
@@ -121,13 +123,20 @@ export class ProjectorSlideManager {
     }
 
     public renderSlide = async(index: number): Promise<void> => {
-        console.log("call slide ernder");
-        await this.setSlideAndWhiteboardSize(this.getSlideObj());
-        this.getSlideObj().renderSlide(index);
+        const slide = this.getSlideObj();
+        if (slide) {
+            await this.setSlideAndWhiteboardSize(slide);
+            slide.renderSlide(index);
+        }
     };
 
-    public async getSlideCount(): Promise<number> {
-        return await this.getSlideObj().getSlideCountAsync();
+    public async getSlidePageCount(): Promise<number> {
+        const slide = this.getSlideObj();
+        if (slide) {
+            return await slide.getSlideCountAsync()
+        } else {
+            return 0;
+        }
     }
 
     public initSlide = async(): Promise<Slide> => {
@@ -137,8 +146,6 @@ export class ProjectorSlideManager {
             if (this.slide) {
                 return this.slide;
             }
-            console.log("ProjectorDisplayer.instance ", ProjectorDisplayer.instance);
-            
             const slide = new Slide({
                 anchor: ProjectorDisplayer.instance!.containerRef!,
                 interactive: true,
@@ -158,18 +165,19 @@ export class ProjectorSlideManager {
 
     public setResource = async (taskId: string, prefix: string): Promise<void> => {
         const slide = this.getSlideObj();
-        slide.setResource(taskId, prefix);
-        const [width, height] = await slide.getSizeAsync();
-        this.slideWidth = width;
-        this.slideHeight = height;
+        if (slide) {
+            slide.setResource(taskId, prefix);
+            const [width, height] = await slide.getSizeAsync();
+            this.slideWidth = width;
+            this.slideHeight = height;
+        }
     }
 
     public async setSlideState(slideState: SlideState): Promise<void> {
-        await this.setSlideAndWhiteboardSize(this.getSlideObj());
-        await this.getSlideObj().setSlideState(slideState);
-    }
-
-    public getSlideState(): SlideState {
-        return this.getSlideObj().slideState;
+        const slide = this.getSlideObj();
+        if (slide) {
+            await this.setSlideAndWhiteboardSize(slide);
+            await slide.setSlideState(slideState);
+        }
     }
 }

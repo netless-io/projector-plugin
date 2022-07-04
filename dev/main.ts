@@ -37,29 +37,46 @@ async function main(): Promise<void> {
         errorCallback: (e) => {console.error(e)}
       }
   });
-  (window as any).projector = projectorPlugin;
-  bindKey(projectorPlugin);
-
-  document.getElementById("btn")!.onclick = async () => {
-    await projectorPlugin.createSlide({
-      uuid: devTaskUUID,
-      prefix: devTaskPrefix,
-    });
-  }
+  if(projectorPlugin) {
+    (window as any).projector = projectorPlugin;
+    bindKey(projectorPlugin);
   
-  document.getElementById("btn2")!.onclick = async () => {
-    const attributes = room.getInvisiblePlugin("projector-plugin")?.attributes;
-    console.log("attributes ", attributes);
-    
-    if (attributes) {
-      const attr: any = {};
-      Object.keys(attributes).forEach(key => {
-          attr[key] = undefined;
+    document.getElementById("btn")!.onclick = async () => {
+      let cuuid = (document.getElementById("cuuid") as HTMLInputElement).value;
+      let cprefix = (document.getElementById("cprefix") as HTMLInputElement).value;
+      if (!cuuid || !cprefix) {
+        cuuid = devTaskUUID;
+        cprefix = devTaskPrefix;
+      }
+      await projectorPlugin.createSlide({
+        uuid: cuuid,
+        prefix: cprefix,
       });
-      console.log("clean ", attr);
-      room.getInvisiblePlugin("projector-plugin")?.setAttributes({...attr});
+    }
+  
+    document.getElementById("btn2")!.onclick = async () => {
+      const jumpuuid = (document.getElementById("jumpuuid") as HTMLInputElement).value;
+      const jumpindex = (document.getElementById("jumpindex") as HTMLInputElement).value;
+      if (jumpindex) {
+        await projectorPlugin.changeSlide(jumpuuid, parseInt(jumpindex));
+      } else {
+        await projectorPlugin.changeSlide(jumpuuid);
+      }
     }
     
+    document.getElementById("btn3")!.onclick = async () => {
+      const attributes = room.getInvisiblePlugin("projector-plugin")?.attributes;
+      console.log("attributes ", attributes);
+      
+      if (attributes) {
+        const attr: any = {};
+        Object.keys(attributes).forEach(key => {
+            attr[key] = undefined;
+        });
+        console.log("clean ", attr);
+        room.getInvisiblePlugin("projector-plugin")?.setAttributes({...attr});
+      }
+    }
   }
 }
 

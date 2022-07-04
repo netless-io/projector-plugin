@@ -31,9 +31,12 @@ async function main(): Promise<void> {
   if (appDiv) {
     room.bindHtmlElement(appDiv as HTMLDivElement);
   }
-  // 该插件全局应该只有一个
-  const projectorPlugin = await ProjectorPlugin.getInstance(room);
-
+  // singlelecton
+  const projectorPlugin = await ProjectorPlugin.getInstance(room, {
+      callback: {
+        errorCallback: (e) => {console.error(e)}
+      }
+  });
   (window as any).projector = projectorPlugin;
   bindKey(projectorPlugin);
 

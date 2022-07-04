@@ -15,6 +15,7 @@ import { EventEmitter2 } from "eventemitter2";
 import type { SlideState } from "./projectorSlideManager";
 import { ProjectorSlideManager } from "./projectorSlideManager";
 import { getslideCount, isFileExist } from "./util";
+import { ProjectorError, ProjectorErrorType } from "./error";
 
 export type Logger = {
     readonly info: (...messages: any[]) => void;
@@ -22,7 +23,7 @@ export type Logger = {
     readonly error: (...messages: any[]) => void;
 }
 export type ProjectorCallback = {
-    errorCallback: (e: Error) => void;
+    errorCallback: (e: ProjectorError) => void;
 }
 
 export enum ProjectorEvents {
@@ -32,7 +33,6 @@ export enum ProjectorEvents {
     UpdateParentContainerRect = "UpdateParentContainerRect",
     SetParentContainerRect = "SetParentContainerRect",
 }
-
 
 type ProjectorAdaptor = {
     logger?: Logger;
@@ -217,11 +217,12 @@ export class ProjectorPlugin extends InvisiblePlugin<ProjectorStateStore> {
         }
     }
 
-    private getManagerInstance() {
+    private getManagerInstance(): ProjectorSlideManager | undefined {
         if (ProjectorPlugin.currentSlideManager) {
             return ProjectorPlugin.currentSlideManager;
         } else {
-            throw new Error("[Projector plugin] can not find slideManager");
+            ProjectorPlugin.projectorCallbacks.errorCallback(new ProjectorError("[Projector plugin] can not find slideManager", ProjectorErrorType.RuntimeError));
+            return undefined;
         }
     }
 
@@ -239,14 +240,14 @@ export class ProjectorPlugin extends InvisiblePlugin<ProjectorStateStore> {
         if (!projectorPlugin) {
             if (isRoom(displayer) && displayer.isWritable) {
                 if (!displayer.isWritable) {
-                    throw new Error("[Projector plugin] room is not writable");
+                    throw new ProjectorError("[Projector plugin] room is not writable", ProjectorErrorType.RuntimeError);
                 }
                 projectorPlugin = (await displayer.createInvisiblePlugin(
                     ProjectorPlugin,
                     {}
                 )) as ProjectorPlugin;
             } else {
-                throw new Error("[Projector plugin] plugin only working on writable room")
+                throw new ProjectorError("[Projector plugin] plugin only working on writable room", ProjectorErrorType.RuntimeError);
             }
         }
         await projectorPlugin.init();
@@ -277,7 +278,7 @@ export class ProjectorPlugin extends InvisiblePlugin<ProjectorStateStore> {
                 const slideState = this.attributes[currentSlideUUID] as SlideState;
                 await this.restoreSlideByState(slideState);
             } else {
-                throw new Error("[Projector plugin] current slide not initiated");
+                throw new ProjectorError("[Projector plugin] current slide not initiated", ProjectorErrorType.RuntimeError);
             }
         }
     }
@@ -342,11 +343,11 @@ export class ProjectorPlugin extends InvisiblePlugin<ProjectorStateStore> {
     }
 
     public nextStep(): void {
-        this.getManagerInstance().nextStep();
+        this.getManagerInstance()?.nextStep();
     }
 
     public prevStep(): void {
-        this.getManagerInstance().prevStep();
+        this.getManagerInstance()?.prevStep();
     }
 
     /**

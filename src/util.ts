@@ -1,6 +1,6 @@
 import { ProjectorPlugin } from "./projectorPlugin";
 
-export const delay = (value: number) => new Promise(resolve => setTimeout(resolve, value));
+export const delay = (value: number): Promise<void> => new Promise(resolve => setTimeout(resolve, value));
 
 export async function waitUntil(fn: () => boolean, timeout: number): Promise<void> {
     const start = Date.now();

@@ -53,11 +53,11 @@ type ProjectorStateStore = {
 
 const isRoom = _isRoom as (displayer: Displayer) => displayer is Room;
 
-export declare type WhiteboardEventListener = (event: Event)=>void;
+type WhiteboardEventListener = (event: Event)=>void;
 
 export class ProjectorPlugin extends InvisiblePlugin<ProjectorStateStore> {
     // a unique king, different from other plugins.
-    static readonly kind: string = "projector-plugin";
+    public static readonly kind: string = "projector-plugin";
     // room scenen, used to determine whether this slide-page is jumped from non-slide-page
     private static _scenePath: string | undefined;
     public static _emitter: EventEmitter2 = new EventEmitter2();

@@ -1,6 +1,6 @@
 # Projector-plugin
 
-该项目基于 @netless/slide 进行开发，使用 canvas 来渲染 ppt。
+该项目基于 @netless/slide 进行开发，将 @netless/slide 与作为白板插件进行封装，所有状态都交由白板进行同步以实现各用户间的状态同步，同时保持 ppt 页面与白板页面翻页同步。
 
 ## 原理
 PPT 内部操作（上一步、下一步、跳页）-> 得到 ppt 事件和即将变化的 state -> 通过白板状态回调设置全局 state -> 通过白板事件 api 发送操作事件 -> 接到事件调用 slide api 传入事件

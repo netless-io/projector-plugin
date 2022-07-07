@@ -1,6 +1,6 @@
 {
   "name": "@netless/projector-plugin",
-  "version": "0.0.3",
+  "version": "0.0.4",
   "description": "",
   "main": "./dist/projector-plugin.cjs.js",
   "module": "./dist/projector-plugin.es.js",

@@ -1,15 +1,15 @@
 
 import type { Room} from "white-web-sdk";
 import { WhiteWebSdk } from "white-web-sdk";
+import type { ProjectorError} from "@netless/projector-plugin";
 import {ProjectorDisplayer, ProjectorPlugin} from "@netless/projector-plugin";
 import "./index.css";
+import { bindControlPanel } from "./controlPanel";
 
-const whiteBoardAppientirId = "";
-const whiteBoardSDKToken = "";
+const whiteBoardAppientirId = ""
+const whiteBoardSDKToken = ""
 const debugRoomId = "";
 const debugRoomToken = "";
-const devTaskUUID = "";
-const devTaskPrefix = "";
 
 const whiteboard = new WhiteWebSdk({
     appIdentifier: whiteBoardAppientirId,
@@ -28,32 +28,27 @@ async function main(): Promise<void> {
     : createRoom());
   (window as any).room = room;
 
-  console.log("start init plugin");
-  
-  const projectorPlugin = new ProjectorPlugin({ kind: ProjectorPlugin.kind, displayer: room}, {
-    info: console.log,
-    error: console.error,
-    warn: console.warn,
-  }, {
-    errorCallback: (e: Error) => console.error(`catch ${e.stack}`)
-  });
-  await projectorPlugin.initSlide(room, devTaskUUID, devTaskPrefix);
-  (window as any).projector = projectorPlugin;
-
-  function nextStep() {
-    projectorPlugin.nextStep();
-  }
-
-  function prevStep() {
-    projectorPlugin.prevStep();
-  }
-
-  (window as any).nextStep = nextStep;
-  (window as any).prevStep = prevStep;
-
-  const appDiv = document.getElementById("root")
+  const appDiv = document.getElementById("root");
   if (appDiv) {
     room.bindHtmlElement(appDiv as HTMLDivElement);
+  }
+  console.log("start init plugin");
+  
+  const projectorPlugin = await ProjectorPlugin.getInstance(room, {
+    logger: {
+      info: console.log,
+      error: console.error,
+      warn: console.warn,
+    },
+    callback: {
+      errorCallback: (e: ProjectorError) => {console.error(e)}
+    }
+  });
+  if (!projectorPlugin) {
+    alert("something wrong when create plugin!")
+  } else {
+    bindControlPanel(projectorPlugin, room);
+    (window as any).projector = projectorPlugin;
   }
 }
 

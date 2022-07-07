@@ -20,7 +20,7 @@
   "author": "netless",
   "license": "ISC",
   "dependencies": {
-    "@netless/projector-plugin": "0.0.1",
+    "@netless/projector-plugin": "0.0.4",
     "react": ">=16.8.0",
     "react-dom": ">=16.8.0",
     "white-web-sdk": "2.16.24"

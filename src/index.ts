@@ -8,4 +8,7 @@ export {
 export {
     ProjectorDisplayer
 } from "./projectorDisplayer";
-export * from "./error";
+export {
+    ProjectorError,
+    ProjectorErrorType,
+} from "./error";

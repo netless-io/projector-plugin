@@ -1,6 +1,7 @@
 import type { Room } from "white-web-sdk";
 import { DeviceType, WhiteWebSdk } from "white-web-sdk";
 import { ProjectorPlugin, ProjectorDisplayer } from "../src";
+import type { ProjectorError } from "../src/error";
 
 const whiteBoardAppientirId = "";
 const whiteBoardSDKToken = "";
@@ -34,7 +35,7 @@ async function main(): Promise<void> {
   // singlelecton
   const projectorPlugin = await ProjectorPlugin.getInstance(room, {
       callback: {
-        errorCallback: (e) => {console.error(e)}
+        errorCallback: (e: ProjectorError) => {console.error(e)}
       }
   });
   if(projectorPlugin) {

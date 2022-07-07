@@ -1,8 +1,35 @@
 #root {
+    flex: 1;
     display: flex;
-    width: 100vw;
-    height: 100vh;
-    padding: 16px 16px;
+    margin: 16px;
+    padding: 0;
+    position: relative;
     overflow: hidden;
     box-sizing: border-box;
+    align-items: center;
+    justify-content: center;
+}
+
+#classroom {
+    height: 100vh; width: 100vw; display: flex; overflow: hidden;
+}
+
+#previewpanel {
+    height: 100%; display: flex; width: 200px;align-items: center; justify-content: top; flex-direction: column; overflow-y: scroll
+}
+
+.slide_preview {
+    width: 100%; padding: 10px; display: flex; flex-direction: column; align-items: center;
+}
+
+.slide_preview_img {
+    width: 100%; flex: 1; display: block;
+}
+
+.slide_preview_text {
+    width: 100%; height: 20px; overflow-wrap: anywhere; display: inline;
+}
+
+#controlpanel {
+    display: flex; width: 200px;align-items: center; justify-content: center; flex-direction: column
 }

@@ -319,6 +319,7 @@ export class ProjectorPlugin extends InvisiblePlugin<ProjectorStateStore> {
         const slideState = this.attributes[uuid] as SlideState;
         if (slideState) {
             const slideManager = await this.refreshCurrentSlideManager(slideState.taskId, slideState.url);
+            
             if (slideIndex) {
                 slideManager.renderSlide(slideIndex);
             } else {
@@ -354,6 +355,10 @@ export class ProjectorPlugin extends InvisiblePlugin<ProjectorStateStore> {
         ProjectorPlugin.currentSlideManager = slideManager;
         ProjectorPlugin.logger.info(`[Projector plugin] refresh currentSlideManager object`);
         return ProjectorPlugin.currentSlideManager;
+    }
+
+    public renderSlidePage(index: number): void {
+        this.getManagerInstance()?.renderSlide(index);
     }
 
     public nextStep(): void {

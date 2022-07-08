@@ -126,7 +126,7 @@ async function onSlidePreviewClick(plugin: ProjectorPlugin, event: MouseEvent): 
 async function onPagePreviewClick(plugin: ProjectorPlugin, event: MouseEvent): Promise<void> {
     const uuidAndIndex = event.target?.parentElement.id;
     const [uuid, index] = uuidAndIndex.split("_");
-    await plugin.changeSlide(uuid, index);
+    await plugin.renderSlidePage(index);
 }
 
 async function changeScenePath(room: Room) {

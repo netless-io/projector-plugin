@@ -420,7 +420,9 @@ export class ProjectorPlugin extends InvisiblePlugin<ProjectorStateStore> {
     }[]> => {
         const keys = Object.keys(this.attributes);
         const currentSlideUUIDIndex = keys.indexOf("currentSlideUUID");
-        keys.splice(currentSlideUUIDIndex, 1);
+        if (currentSlideUUIDIndex !== -1) {
+            keys.splice(currentSlideUUIDIndex, 1);
+        }
         const slides = [];
         for (let index = 0; index < keys.length; index++) {
             const uuid = keys[index];

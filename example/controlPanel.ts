@@ -131,5 +131,6 @@ async function onPagePreviewClick(plugin: ProjectorPlugin, event: MouseEvent): P
 
 async function changeScenePath(room: Room) {
     const scenePath = (document.getElementById("scene_path") as HTMLInputElement)?.value;
+    cleanPreviewPanel();
     room.setScenePath(scenePath);
 }

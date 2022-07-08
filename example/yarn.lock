@@ -93,10 +93,10 @@
   resolved "https://registry.npmjs.org/@netless/canvas-polyfill/-/canvas-polyfill-0.0.4.tgz#b5f28eefeb9c1e8ff8253fa1b044ccb1dc1b7c9c"
   integrity sha512-7NzsJrba0R/mq/l10SkIZQwbrNVJyPxZYrjK6xL3Ts732iWAVuS2UB0u3s6iGeUVcqV39A679yva8APWRl4M0A==
 
-"@netless/projector-plugin@0.0.5":
-  version "0.0.5"
-  resolved "https://registry.npmjs.org/@netless/projector-plugin/-/projector-plugin-0.0.5.tgz#7bd50e615fe6d3c8f10959cd18cb99cf6f27ba4d"
-  integrity sha512-3zuLxpVYVeFeIU1iowB2BxUJ50PeMDSsmOHYfDH2ypw5+8J6ZP+KCogmQhUXno3DDQi92FVnNqaHYxxvj3NYOQ==
+"@netless/projector-plugin@0.0.6":
+  version "0.0.6"
+  resolved "https://registry.npmjs.org/@netless/projector-plugin/-/projector-plugin-0.0.6.tgz#9390a6c38888939313f9d5fc6a82a3effcb1ded9"
+  integrity sha512-71ofEFCsfE14fFTglwXgsEhjQztyOhovvEUyGGA4nmfsQzS5Jaxnvc21baRL3bpFNDER+lKESh4rOR3YWEu9gQ==
   dependencies:
     "@netless/slide" "0.4.5"
     eventemitter2 "6.4.5"

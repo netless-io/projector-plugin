@@ -3,7 +3,6 @@ import type { Room } from "white-web-sdk";
 
 export const bindControlPanel = (plugin: ProjectorPlugin, room: Room): void => {
     document.getElementById("btn_insert")!.onclick = () => insertSlide(plugin);
-    document.getElementById("btn_jump")!.onclick = () => changeSlide(plugin);
     document.getElementById("btn_prevstep")!.onclick = () => prevStep(plugin);
     document.getElementById("btn_nextstep")!.onclick = () => nextStep(plugin);
     document.getElementById("btn_delete")!.onclick = () => deleteSlide(plugin);
@@ -18,15 +17,6 @@ function insertSlide(plugin: ProjectorPlugin): void {
         alert("param error");
     } else {
         plugin.createSlide({uuid, prefix});
-    }
-}
-
-function changeSlide(plugin: ProjectorPlugin) {
-    const uuid = (document.getElementById("jump_uuid") as HTMLInputElement)?.value;
-    if (!uuid) {
-        alert("param error");
-    } else {
-        plugin.changeSlide(uuid);
     }
 }
 
@@ -49,11 +39,8 @@ function deleteSlide(plugin: ProjectorPlugin) {
 
 function cleanPreviewPanel() {
     const previewPanel = document.getElementById("previewpanel");
-    if (previewPanel) {
-        for (let index = 0; index < previewPanel.children.length; index++) {
-            const element = previewPanel.children.item(index);
-            element?.remove();
-        }
+    while(previewPanel?.children.item(0)) {
+        previewPanel?.children.item(0)?.remove();
     }
 }
 
@@ -138,7 +125,6 @@ async function onSlidePreviewClick(plugin: ProjectorPlugin, event: MouseEvent): 
 
 async function onPagePreviewClick(plugin: ProjectorPlugin, event: MouseEvent): Promise<void> {
     const uuidAndIndex = event.target?.parentElement.id;
-    console.log("uuid ", uuidAndIndex);
     const [uuid, index] = uuidAndIndex.split("_");
     await plugin.changeSlide(uuid, index);
 }

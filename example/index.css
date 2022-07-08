@@ -15,11 +15,11 @@
 }
 
 #previewpanel {
-    height: 100%; display: flex; width: 200px;align-items: center; justify-content: top; flex-direction: column; overflow-y: scroll
+    height: 100%; display: flex; width: 200px;align-items: center; justify-content: top; flex-direction: column; overflow-y: scroll; border: solid;
 }
 
-.slide_preview {
-    width: 100%; padding: 10px; display: flex; flex-direction: column; align-items: center;
+.slide_preview_frame {
+    width: 100%; display: flex; flex-direction: column; align-items: center; border-bottom: solid; border-width: 1px; cursor: pointer;
 }
 
 .slide_preview_img {
@@ -27,7 +27,7 @@
 }
 
 .slide_preview_text {
-    width: 100%; height: 20px; overflow-wrap: anywhere; display: inline;
+    width: 100%; overflow-wrap: anywhere; display: block; text-align: center;
 }
 
 #controlpanel {

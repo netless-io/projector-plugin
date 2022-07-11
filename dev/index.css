@@ -1,0 +1,35 @@
+#root {
+    flex: 1;
+    display: flex;
+    margin: 16px;
+    padding: 0;
+    position: relative;
+    overflow: hidden;
+    box-sizing: border-box;
+    align-items: center;
+    justify-content: center;
+}
+
+#classroom {
+    height: 100vh; width: 100vw; display: flex; overflow: hidden;
+}
+
+#previewpanel {
+    height: 100%; display: flex; width: 200px;align-items: center; justify-content: top; flex-direction: column; overflow-y: scroll; border: solid;
+}
+
+.slide_preview_frame {
+    width: 100%; display: flex; flex-direction: column; align-items: center; border-bottom: solid; border-width: 1px; cursor: pointer;
+}
+
+.slide_preview_img {
+    width: 100%; flex: 1; display: block;
+}
+
+.slide_preview_text {
+    width: 100%; overflow-wrap: anywhere; display: block; text-align: center;
+}
+
+#controlpanel {
+    display: flex; width: 200px;align-items: center; justify-content: center; flex-direction: column
+}

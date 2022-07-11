@@ -28,7 +28,7 @@
     "react": ">=16.8.0",
     "typescript": "^4.4.3",
     "vite": "^2.5.6",
-    "white-web-sdk": "^2.16.20"
+    "white-web-sdk": "^2.16.26"
   },
   "keywords": [],
   "author": "netless",

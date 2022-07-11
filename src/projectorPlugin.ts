@@ -318,6 +318,9 @@ export class ProjectorPlugin extends InvisiblePlugin<ProjectorStateStore> {
     public async changeSlide(uuid: string, slideIndex?: number): Promise<void> {
         const slideState = this.attributes[uuid] as SlideState;
         if (slideState) {
+            this.setAttributes({
+                currentSlideUUID: slideState.taskId,
+            });
             const slideManager = await this.refreshCurrentSlideManager(slideState.taskId, slideState.url);
             
             if (slideIndex) {
@@ -326,9 +329,6 @@ export class ProjectorPlugin extends InvisiblePlugin<ProjectorStateStore> {
                 slideManager.setSlideState(slideState);
             }
             
-            this.setAttributes({
-                currentSlideUUID: slideState.taskId,
-            });
             let index = 1;
             if (slideIndex) {
                 index = slideIndex;

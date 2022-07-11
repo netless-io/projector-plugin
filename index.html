@@ -1,26 +1,28 @@
 <!DOCTYPE html>
 <html lang="en">
-  <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Vite App</title>
-  </head>
-  <body>
-    <div id="app" style=" display: flex;
-      width: 100vw;
-      height: 100vh;
-      padding: 16px 16px;
-      overflow: hidden;
-      box-sizing: border-box;
-      align-items: center;
-      justify-content: center;"></div>
-    <button id="btn" style="top: 0; left: 0; position: absolute;">插入 ppt</button>
-    <input id="cuuid" style="top: 0; left: 100px; position: absolute;"/>
-    <input id="cprefix" style="top: 0; left: 200px; position: absolute;"/>
-    <button id="btn2" style="top: 0; left: 300px; position: absolute;">跳转 ppt</button>
-    <input id="jumpuuid" style="top: 0; left: 400px; position: absolute;"/>
-    <input id="jumpindex" style="top: 0; left: 500px; position: absolute;"/>
-    <button id="btn3" style="top: 0; left: 600px; position: absolute;">清除 attr</button>
-    <script type="module" src="/dev/main.ts"></script>
-  </body>
+<head>
+    <meta charset="UTF-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Projector</title>
+</head>
+<body style="margin: 0;">
+    <div id="classroom">
+        <div id="root"></div>
+        <div id="previewpanel"></div>
+        <div id="controlpanel">
+            <button id="btn_insert" style=" display: block; margin-top: 20px;">insert slide</button>
+            <input id="insert_uuid" style=" display: block;" placeholder="uuid"/>
+            <input id="insert_prefix" style=" display: block;" placeholder="prefix"/>
+            <button id="btn_prevstep" style=" display: block; margin-top: 20px;">prev step</button>
+            <button id="btn_nextstep" style=" display: block; margin-top: 20px;">next step</button>
+            <button id="btn_delete" style=" display: block; margin-top: 20px;">delete slide</button>
+            <input id="delete_uuid" style=" display: block;" placeholder="uuid"/>
+            <button id="btn_list" style=" display: block; margin-top: 20px;">get slide list</button>
+            <button id="btn_scene_path" style=" display: block; margin-top: 20px;">change scene path</button>
+            <input id="scene_path" style=" display: block;" placeholder="scenePath"/>
+        </div>
+    </div>
+    <script src="./dev/main.ts" type="module"></script>
+</body>
 </html>

@@ -12,7 +12,8 @@ PPT 中途进入操作 -> 初始化时读取全局 state -> 根据全局 state �
 
 ## 用法
 初始化:
-```
+
+```js
 const room = await createRoom();    // 用户需要自己创建房间实例
   
 const projectorPlugin = new ProjectorPlugin({
@@ -34,7 +35,8 @@ await projectorPlugin.initSlide(room,
 
 动画播放:
 动画播放本身可以点击 ppt 内容，也可以通过调用方法来触发播放(有触发器的动画还是要点击才能播放)
-```
+
+```js
 projectorPlugin.nextStep()；    // 动画下一步
 projectorPlugin.prevStep()；    // 动画上一步
 ```

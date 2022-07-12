@@ -71,6 +71,7 @@ async function joinRoom(roomUUID: string, roomToken: string): Promise<Room> {
   const uid = "uid";
   return whiteboard.joinRoom({
     uuid: roomUUID,
+    disableNewPencil: false,
     roomToken,
     uid,
     invisiblePlugins: [ProjectorPlugin],

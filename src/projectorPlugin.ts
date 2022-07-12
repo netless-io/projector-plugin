@@ -8,6 +8,7 @@ import {
     InvisiblePlugin,
     isPlayer,
     isRoom as _isRoom,
+    autorun,
 } from "white-web-sdk";
 import { ProjectorDisplayer } from "./projectorDisplayer";
 import {  SLIDE_EVENTS } from "@netless/slide";
@@ -73,12 +74,12 @@ export class ProjectorPlugin extends InvisiblePlugin<ProjectorStateStore> {
 
     public static currentSlideManager?: ProjectorSlideManager;
 
-    onAttributesUpdate = async (attributes: ProjectorStateStore): Promise<void> => {
-        if (attributes.currentSlideUUID) {
-            if (!ProjectorPlugin.currentSlideManager) {
-                ProjectorPlugin.currentSlideManager = new ProjectorSlideManager(this);
-                await ProjectorPlugin.currentSlideManager.initSlide();
-            }
+    private onPluginAttributesUpdate = async (): Promise<void> => {
+        if (!ProjectorPlugin.currentSlideManager ||
+            this.attributes.currentSlideUUID !== ProjectorPlugin.currentSlideManager?.slide?.slideState.taskId) {
+                const slideState = this.attributes[this.attributes.currentSlideUUID] as SlideState;
+                await this.refreshCurrentSlideManager(this.attributes.currentSlideUUID, slideState.url);
+                await ProjectorPlugin.currentSlideManager?.setSlideState(slideState);
         }
     }
 
@@ -269,6 +270,7 @@ export class ProjectorPlugin extends InvisiblePlugin<ProjectorStateStore> {
     }
 
     private init = async (): Promise<void> => {
+        
         const scenePath = this.displayer.state.sceneState.scenePath;
         ProjectorPlugin._scenePath = scenePath;
         
@@ -295,6 +297,7 @@ export class ProjectorPlugin extends InvisiblePlugin<ProjectorStateStore> {
                 ProjectorPlugin.logger.warn("[Projector plugin] current slide not initiated", ProjectorErrorType.RuntimeError);
             }
         }
+        autorun(this.onPluginAttributesUpdate);
     }
 
     /**
@@ -315,27 +318,16 @@ export class ProjectorPlugin extends InvisiblePlugin<ProjectorStateStore> {
     }
 
     // change to a created slide
-    public async changeSlide(uuid: string, slideIndex?: number): Promise<void> {
+    public async changeSlide(uuid: string): Promise<void> {
         const slideState = this.attributes[uuid] as SlideState;
         if (slideState) {
             this.setAttributes({
                 currentSlideUUID: slideState.taskId,
             });
-            const slideManager = await this.refreshCurrentSlideManager(slideState.taskId, slideState.url);
-            
-            if (slideIndex) {
-                slideManager.renderSlide(slideIndex);
-            } else {
-                slideManager.setSlideState(slideState);
-            }
             
             let index = 1;
-            if (slideIndex) {
-                index = slideIndex;
-            } else {
-                if (slideState.currentSlideIndex && slideState.currentSlideIndex !== -1) {
-                    index = slideState.currentSlideIndex;
-                }
+            if (slideState.currentSlideIndex && slideState.currentSlideIndex !== -1) {
+                index = slideState.currentSlideIndex;
             }
             
             await this.jumpToScene(slideState.taskId, index);
@@ -345,13 +337,13 @@ export class ProjectorPlugin extends InvisiblePlugin<ProjectorStateStore> {
     }
 
     private refreshCurrentSlideManager = async (uuid: string, prefix: string): Promise<ProjectorSlideManager> => {
-        const slideManager = new ProjectorSlideManager(this);
-        await slideManager.initSlide();
-        slideManager.setResource(uuid, prefix);
         if (ProjectorPlugin.currentSlideManager) {
             // destroy manager to avoid multiple slide instances
             ProjectorPlugin.currentSlideManager.destory();
         }
+        const slideManager = new ProjectorSlideManager(this);
+        await slideManager.initSlide();
+        slideManager.setResource(uuid, prefix);
         ProjectorPlugin.currentSlideManager = slideManager;
         ProjectorPlugin.logger.info(`[Projector plugin] refresh currentSlideManager object`);
         return ProjectorPlugin.currentSlideManager;
@@ -397,7 +389,6 @@ export class ProjectorPlugin extends InvisiblePlugin<ProjectorStateStore> {
                 ProjectorPlugin.logger.error(`[Projector plugin] can not delete this slide because target is rendering`);
                 return false;
             } else {
-                console.log(`/${ProjectorPlugin.kind}/${uuid}`);
                 this.displayer.removeScenes(`/${ProjectorPlugin.kind}/${uuid}`);
                 this.setAttributes({
                     [uuid]: undefined

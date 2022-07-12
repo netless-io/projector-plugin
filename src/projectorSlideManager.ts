@@ -104,7 +104,7 @@ export class ProjectorSlideManager {
         if (this.slide) {
             return this.slide;
         } else {
-            ProjectorPlugin.projectorCallbacks.errorCallback(new ProjectorError(`Projector plugin] can not find slide object`, ProjectorErrorType.RuntimeError));
+            ProjectorPlugin.projectorCallbacks.errorCallback(new ProjectorError(`[Projector plugin] can not find slide object`, ProjectorErrorType.RuntimeError));
             return undefined;
         }
     }

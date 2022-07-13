@@ -4,7 +4,7 @@ import { WhiteWebSdk } from "white-web-sdk";
 import type { ProjectorError} from "@netless/projector-plugin";
 import {ProjectorDisplayer, ProjectorPlugin} from "@netless/projector-plugin";
 import "./index.css";
-import { bindControlPanel } from "./controlPanel";
+import { ControlPanel } from "./controlPanel";
 
 const whiteBoardAppientirId = ""
 const whiteBoardSDKToken = ""
@@ -33,7 +33,8 @@ async function main(): Promise<void> {
     room.bindHtmlElement(appDiv as HTMLDivElement);
   }
   console.log("start init plugin");
-  
+  const controlPanel = new ControlPanel();
+
   const projectorPlugin = await ProjectorPlugin.getInstance(room, {
     logger: {
       info: console.log,
@@ -47,7 +48,7 @@ async function main(): Promise<void> {
   if (!projectorPlugin) {
     alert("something wrong when create plugin!")
   } else {
-    bindControlPanel(projectorPlugin, room);
+    controlPanel.setup(projectorPlugin, room);
     (window as any).projector = projectorPlugin;
   }
 }

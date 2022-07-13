@@ -24,27 +24,30 @@ export class ProjectorSlideManager {
     public slide: Slide | undefined;
     public slideWidth: number | undefined;
     public slideHeight: number | undefined;
+    private cameraChangeWatcher?: number;
 
     constructor(context: ProjectorPlugin) {
         this.context = context;
     }
 
     private onStateChange = (state: any): void => {
-        ProjectorPlugin.logger.info("[Projector plugin]: local state changed");
+        ProjectorPlugin.logger.info("[Projector plugin]: local state changed ", {...state}) ;
         if (isRoom(this.context.displayer) && (this.context.displayer as Room).isWritable) {
+            const slideState = this.context.attributes[state.taskId] as SlideState;
+            let slideChanged = false;
+            if (slideState.currentSlideIndex !== state.currentSlideIndex) {
+                slideChanged = true;
+            }
             this.context.setAttributes({[state.taskId]: state});
+            if (slideChanged) {
+                const scenePath = `/${ProjectorPlugin.kind}/${this.slide?.slideState.taskId}/${state.currentSlideIndex}`;
+            
+                ProjectorPlugin.logger.info(`[Projector plugin] scenePath change to ${scenePath}`);
+                (this.context.displayer as Room).setScenePath(scenePath);
+            }
         }
     }
 
-    private onSlideChange = (index: number): void => {
-        ProjectorPlugin.logger.info(`[ProjecloadPPTByAttributestor plugin] slide change to ${index}`);
-        if (isRoom(this.context.displayer) && (this.context.displayer as Room).isWritable) {
-            const scenePath = `/${ProjectorPlugin.kind}/${this.slide?.slideState.taskId}/${index}`;
-            
-            ProjectorPlugin.logger.info(`[Projector plugin] scenePath change to ${scenePath}`);
-            (this.context.displayer as Room).setScenePath(scenePath);
-        }
-    }
     private onSlideEventDispatch = (event: SyncEvent): void => {
         if (isRoom(this.context.displayer) && (this.context.displayer as Room).isWritable) {
             const payload: EventPayload = {
@@ -53,6 +56,12 @@ export class ProjectorSlideManager {
             };
             ProjectorPlugin.logger.info("[Projector plugin] dispatch: ", JSON.stringify(event));
             (this.context.displayer as Room).dispatchMagixEvent(SLIDE_EVENTS.syncDispatch, payload);
+        }
+    }
+
+    private onSlideRendered = (index: number): void =>  {
+        if (this.slide) {
+            ProjectorPlugin.projectorCallbacks.onSlideRendered(this.slide.slideState.taskId, index);
         }
     }
 
@@ -82,22 +91,11 @@ export class ProjectorSlideManager {
         });
     }
 
-    public computedStyle(state: DisplayerState): void {
-        if (ProjectorDisplayer.instance) {
-            const {scale, centerX, centerY} = state.cameraState;
-            // The midpoints of the ppt and the whiteboard are aligned, zoom center is the midpoint
-            const transformOrigin = `center`;
-            const x = - (centerX * scale);
-            const y = - (centerY * scale);
-            if (ProjectorDisplayer.instance?.containerRef) {
-                ProjectorDisplayer.instance.containerRef.style.transformOrigin = transformOrigin;
-                ProjectorDisplayer.instance.containerRef.style.transform = `translate(${x}px,${y}px) scale(1, 1)`;
-                if (this.slideWidth && this.slideHeight) {
-                    ProjectorDisplayer.instance.containerRef.style.width = `${this.slideWidth * scale}px`;
-                    ProjectorDisplayer.instance.containerRef.style.height = `${this.slideHeight * scale}px`;
-                }
-            }
-        }
+    private throttling = (next: () => void): void => {
+        clearTimeout(this.cameraChangeWatcher);
+        this.cameraChangeWatcher = setInterval(() => {
+            next();
+        }, 300);
     }
 
     private getSlideObj(): Slide | undefined {
@@ -106,6 +104,39 @@ export class ProjectorSlideManager {
         } else {
             ProjectorPlugin.projectorCallbacks.errorCallback(new ProjectorError(`[Projector plugin] can not find slide object`, ProjectorErrorType.RuntimeError));
             return undefined;
+        }
+    }
+
+    public computedStyle(state: DisplayerState): void {
+        if (ProjectorDisplayer.instance) {
+            const {scale, centerX, centerY} = state.cameraState;
+            
+            // The midpoints of the ppt and the whiteboard are aligned, zoom center is the midpoint
+            const transformOrigin = `center`;
+            const x = - (centerX * scale);
+            const y = - (centerY * scale);
+            if (ProjectorDisplayer.instance?.containerRef) {
+                ProjectorDisplayer.instance.containerRef.style.transformOrigin = transformOrigin;
+
+                if (this.slideWidth && this.slideHeight) {
+                    const currentWidth = ProjectorDisplayer.instance.containerRef.style.width;
+                    const slideScale = this.slideWidth * scale / parseFloat(currentWidth);
+                    ProjectorDisplayer.instance.containerRef.style.transform = `translate(${x}px,${y}px) scale(${slideScale}, ${slideScale})`;
+                }
+                
+                this.throttling(() => {
+                    if (ProjectorDisplayer.instance?.containerRef) {
+                        if (this.slideWidth && this.slideHeight) {
+                            const newWidth = this.slideWidth * scale
+                            const newHeight = this.slideHeight * scale;
+                            ProjectorDisplayer.instance.containerRef.style.transform = `translate(${x}px,${y}px)`;
+                            ProjectorDisplayer.instance!.containerRef!.style.width = `${newWidth}px`;
+                            ProjectorDisplayer.instance!.containerRef!.style.height = `${newHeight}px`;
+                            this.slide?.updateFixedFrameSize(newWidth, newHeight);
+                        }
+                    }
+                });
+            }
         }
     }
 
@@ -122,7 +153,7 @@ export class ProjectorSlideManager {
         this.slide = undefined;
     }
 
-    public renderSlide = async(index: number): Promise<void> => {
+    public renderSlide = async (index: number): Promise<void> => {
         const slide = this.getSlideObj();
         if (slide) {
             await this.setSlideAndWhiteboardSize(slide);
@@ -133,7 +164,7 @@ export class ProjectorSlideManager {
     public async getSlidePageCount(): Promise<number> {
         const slide = this.getSlideObj();
         if (slide) {
-            return await slide.getSlideCountAsync()
+            return await slide.getSlideCountAsync();
         } else {
             return 0;
         }
@@ -151,10 +182,11 @@ export class ProjectorSlideManager {
                 interactive: true,
                 mode: "interactive",    // fixed
                 resize: true,
+                fixedFrameSize: true,
             });
             slide.on(SLIDE_EVENTS.stateChange, this.onStateChange);
-            slide.on(SLIDE_EVENTS.slideChange, this.onSlideChange);
             slide.on(SLIDE_EVENTS.syncDispatch, this.onSlideEventDispatch);
+            slide.on(SLIDE_EVENTS.renderEnd, this.onSlideRendered);
 
             this.slide = slide;
             (window as any).slide = slide as any;

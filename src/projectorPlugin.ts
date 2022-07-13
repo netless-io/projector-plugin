@@ -24,6 +24,7 @@ export type Logger = {
     readonly error: (...messages: any[]) => void;
 }
 export type ProjectorCallback = {
+    onSlideRendered: (uuid: string, index: number) => void;
     errorCallback: (e: ProjectorError) => void;
 }
 
@@ -31,8 +32,6 @@ export enum ProjectorEvents {
     DisplayerDidMount = "DisplayerDidMount",
     EnableClick = "EnableClick",
     DisableClick = "DisableClick",
-    UpdateParentContainerRect = "UpdateParentContainerRect",
-    SetParentContainerRect = "SetParentContainerRect",
 }
 
 type ProjectorAdaptor = {
@@ -47,14 +46,14 @@ type ProjectorSlideOption = {
 }
 
 type ProjectorStateStore = {
-    [uuid: string]: SlideState | string,
+    [uuid: string]: SlideState | any,
 } & {
     currentSlideUUID: string,
 }
 
 const isRoom = _isRoom as (displayer: Displayer) => displayer is Room;
 
-type WhiteboardEventListener = (event: Event)=>void;
+type WhiteboardEventListener = (event: Event) => void;
 
 export class ProjectorPlugin extends InvisiblePlugin<ProjectorStateStore> {
     // a unique king, different from other plugins.
@@ -69,17 +68,21 @@ export class ProjectorPlugin extends InvisiblePlugin<ProjectorStateStore> {
         error: console.error,
     };
     public static projectorCallbacks: ProjectorCallback =  {
+        onSlideRendered: (uuid: string, index: number) => {console.error(uuid, index)},
         errorCallback: (e: Error) => {console.error(e)}
     };
 
     public static currentSlideManager?: ProjectorSlideManager;
 
     private onPluginAttributesUpdate = async (): Promise<void> => {
+        if (!this.attributes.currentSlideUUID || !this.attributes[this.attributes.currentSlideUUID]) {
+            return;
+        }
         if (!ProjectorPlugin.currentSlideManager ||
-            this.attributes.currentSlideUUID !== ProjectorPlugin.currentSlideManager?.slide?.slideState.taskId) {
+            this.attributes.currentSlideUUID !== ProjectorPlugin.currentSlideManager.slide?.slideState.taskId) {
                 const slideState = this.attributes[this.attributes.currentSlideUUID] as SlideState;
-                await this.refreshCurrentSlideManager(this.attributes.currentSlideUUID, slideState.url);
-                await ProjectorPlugin.currentSlideManager?.setSlideState(slideState);
+                const manager = await this.refreshCurrentSlideManager(this.attributes.currentSlideUUID, slideState.url);
+                await manager.setSlideState(slideState);
         }
     }
 
@@ -211,18 +214,6 @@ export class ProjectorPlugin extends InvisiblePlugin<ProjectorStateStore> {
         room.putScenes(`/${ProjectorPlugin.kind}/${uuid}`, scenes);
     }
 
-    private async jumpToScene(uuid: string, slideIndex?: number): Promise<void> {
-        if (isRoom(this.displayer)) {
-            let index = 1;
-            if (slideIndex !== undefined) {
-                index = slideIndex;
-            }
-            const scenePath = `/${ProjectorPlugin.kind}/${uuid}/${index}`;
-
-            this.displayer.setScenePath(scenePath);
-        }
-    }
-
     private getManagerInstance(): ProjectorSlideManager | undefined {
         if (ProjectorPlugin.currentSlideManager) {
             return ProjectorPlugin.currentSlideManager;
@@ -233,7 +224,6 @@ export class ProjectorPlugin extends InvisiblePlugin<ProjectorStateStore> {
     }
 
     /**
-     * Throws an error when there is a problem
      * You can not create slide scene by room.putScenes(), Otherwise, the initialization will fail
      * Use createSlide() to create a slide and slide scenes
      * 
@@ -300,6 +290,21 @@ export class ProjectorPlugin extends InvisiblePlugin<ProjectorStateStore> {
         autorun(this.onPluginAttributesUpdate);
     }
 
+    private refreshCurrentSlideManager = async (uuid: string, prefix: string): Promise<ProjectorSlideManager> => {
+        if (ProjectorPlugin.currentSlideManager) {
+            // destroy manager to avoid multiple slide instances
+            ProjectorPlugin.currentSlideManager.destory();
+        }
+
+        const slideManager = new ProjectorSlideManager(this);
+        await slideManager.initSlide();
+        slideManager.setResource(uuid, prefix);
+
+        ProjectorPlugin.currentSlideManager = slideManager;
+        ProjectorPlugin.logger.info(`[Projector plugin] refresh currentSlideManager object`);
+        return ProjectorPlugin.currentSlideManager;
+    }
+
     /**
      * create a slide and slide scenes, then jump to frist slide page.
      * if the slide has already been created，it will clear whiteboard contents of the corresponding scnen
@@ -324,33 +329,18 @@ export class ProjectorPlugin extends InvisiblePlugin<ProjectorStateStore> {
             this.setAttributes({
                 currentSlideUUID: slideState.taskId,
             });
-            
-            let index = 1;
-            if (slideState.currentSlideIndex && slideState.currentSlideIndex !== -1) {
-                index = slideState.currentSlideIndex;
-            }
-            
-            await this.jumpToScene(slideState.taskId, index);
         } else {
             ProjectorPlugin.projectorCallbacks.errorCallback(new ProjectorError("[Projector plugin] slide not created", ProjectorErrorType.RuntimeError));
         }
     }
 
-    private refreshCurrentSlideManager = async (uuid: string, prefix: string): Promise<ProjectorSlideManager> => {
-        if (ProjectorPlugin.currentSlideManager) {
-            // destroy manager to avoid multiple slide instances
-            ProjectorPlugin.currentSlideManager.destory();
+    public async renderSlidePage(index: number): Promise<void> {
+        const manager = this.getManagerInstance();
+        if (manager) {
+            await manager.renderSlide(index);
+        } else {
+            ProjectorPlugin.projectorCallbacks.errorCallback(new ProjectorError("[Projector plugin] slide not initiated", ProjectorErrorType.RuntimeError));
         }
-        const slideManager = new ProjectorSlideManager(this);
-        await slideManager.initSlide();
-        slideManager.setResource(uuid, prefix);
-        ProjectorPlugin.currentSlideManager = slideManager;
-        ProjectorPlugin.logger.info(`[Projector plugin] refresh currentSlideManager object`);
-        return ProjectorPlugin.currentSlideManager;
-    }
-
-    public renderSlidePage(index: number): void {
-        this.getManagerInstance()?.renderSlide(index);
     }
 
     public nextStep(): void {
@@ -359,19 +349,6 @@ export class ProjectorPlugin extends InvisiblePlugin<ProjectorStateStore> {
 
     public prevStep(): void {
         this.getManagerInstance()?.prevStep();
-    }
-
-    /**
-     * clean slide attributes when state is messing
-     */
-    public cleanPluginAttributes(): void {
-        const attr: any = {};
-        Object.keys(this.attributes).forEach(key => {
-            attr[key] = undefined;
-        });
-        this.setAttributes({
-            ...attr
-        });
     }
 
     /**
@@ -410,6 +387,7 @@ export class ProjectorPlugin extends InvisiblePlugin<ProjectorStateStore> {
         slidePreviewImage?: string
     }[]> => {
         const keys = Object.keys(this.attributes);
+        
         const currentSlideUUIDIndex = keys.indexOf("currentSlideUUID");
         if (currentSlideUUIDIndex !== -1) {
             keys.splice(currentSlideUUIDIndex, 1);

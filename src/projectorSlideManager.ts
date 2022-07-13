@@ -182,7 +182,7 @@ export class ProjectorSlideManager {
                 interactive: true,
                 mode: "interactive",    // fixed
                 resize: true,
-                fixedFrameSize: true,
+                fixedFrameSize: {width: 0, height: 0},
             });
             slide.on(SLIDE_EVENTS.stateChange, this.onStateChange);
             slide.on(SLIDE_EVENTS.syncDispatch, this.onSlideEventDispatch);

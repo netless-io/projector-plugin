@@ -42,6 +42,12 @@ async function main(): Promise<void> {
       warn: console.warn,
     },
     callback: {
+      onSlideRendered: (uuid: string, index: number) => {
+        (document.getElementById("page_index") as HTMLSpanElement)!.textContent = `${index}`;
+        if (controlPanel.slidePreivewUUID !== uuid) {
+          controlPanel.listSlidePreview(uuid);
+        }
+      },
       errorCallback: (e: ProjectorError) => {console.error(e)}
     }
   });

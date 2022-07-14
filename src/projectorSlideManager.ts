@@ -95,6 +95,7 @@ export class ProjectorSlideManager {
         clearTimeout(this.cameraChangeWatcher);
         this.cameraChangeWatcher = setInterval(() => {
             next();
+            clearTimeout(this.cameraChangeWatcher);
         }, 300);
     }
 
@@ -129,10 +130,12 @@ export class ProjectorSlideManager {
                         if (this.slideWidth && this.slideHeight) {
                             const newWidth = this.slideWidth * scale
                             const newHeight = this.slideHeight * scale;
-                            ProjectorDisplayer.instance.containerRef.style.transform = `translate(${x}px,${y}px)`;
                             ProjectorDisplayer.instance!.containerRef!.style.width = `${newWidth}px`;
                             ProjectorDisplayer.instance!.containerRef!.style.height = `${newHeight}px`;
-                            this.slide?.updateFixedFrameSize(newWidth, newHeight);
+                            
+                            this.slide?.updateFixedFrameSize(newWidth, newHeight, () => {
+                                ProjectorDisplayer.instance!.containerRef!.style.transform = `translate(${x}px,${y}px)`;
+                            });
                         }
                     }
                 });
@@ -151,6 +154,9 @@ export class ProjectorSlideManager {
     public destory(): void {
         this.slide?.destroy();
         this.slide = undefined;
+        this.slideHeight = undefined;
+        this.slideWidth = undefined;
+        this.cameraChangeWatcher = undefined;
     }
 
     public renderSlide = async (index: number): Promise<void> => {
@@ -177,12 +183,16 @@ export class ProjectorSlideManager {
             if (this.slide) {
                 return this.slide;
             }
+            const anchor = ProjectorDisplayer.instance!.containerRef!;
             const slide = new Slide({
-                anchor: ProjectorDisplayer.instance!.containerRef!,
+                anchor: anchor,
                 interactive: true,
                 mode: "interactive",    // fixed
                 resize: true,
-                fixedFrameSize: {width: 0, height: 0},
+                fixedFrameSize: {
+                    width: anchor.getBoundingClientRect().width,
+                    height: anchor.getBoundingClientRect().height
+                },
             });
             slide.on(SLIDE_EVENTS.stateChange, this.onStateChange);
             slide.on(SLIDE_EVENTS.syncDispatch, this.onSlideEventDispatch);

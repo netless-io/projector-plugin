@@ -43,6 +43,7 @@ async function main(): Promise<void> {
     },
     callback: {
       onSlideRendered: (uuid: string, index: number) => {
+        (document.getElementById("page_index") as HTMLSpanElement)!.textContent = `${index}`;
         if (controlPanel.slidePreivewUUID !== uuid) {
           controlPanel.listSlidePreview(uuid);
         }

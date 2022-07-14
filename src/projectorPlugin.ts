@@ -72,7 +72,43 @@ export class ProjectorPlugin extends InvisiblePlugin<ProjectorStateStore> {
         errorCallback: (e: Error) => {console.error(e)}
     };
 
-    public static currentSlideManager?: ProjectorSlideManager;
+    private static currentSlideManager?: ProjectorSlideManager;
+
+    /**
+     * You can not create slide scene by room.putScenes(), Otherwise, the initialization will fail
+     * Use createSlide() to create a slide and slide scenes
+     * 
+     * Return undefined if initialization failed
+     */ 
+     public static async getInstance(displayer: Displayer, adaptor?: ProjectorAdaptor): Promise<ProjectorPlugin | undefined> {
+        if (adaptor?.logger) {
+            ProjectorPlugin.logger = adaptor.logger;
+        }
+        if (adaptor?.callback) {
+            ProjectorPlugin.projectorCallbacks = adaptor?.callback;
+        }
+        
+        let projectorPlugin = displayer.getInvisiblePlugin(ProjectorPlugin.kind) as
+            | ProjectorPlugin
+            | undefined;
+        if (!projectorPlugin) {
+            if (isRoom(displayer) && displayer.isWritable) {
+                if (!displayer.isWritable) {
+                    ProjectorPlugin.projectorCallbacks.errorCallback(new ProjectorError("[Projector plugin] room is not writable", ProjectorErrorType.RuntimeError));
+                    return undefined;
+                }
+                projectorPlugin = (await displayer.createInvisiblePlugin(
+                    ProjectorPlugin,
+                    {}
+                )) as ProjectorPlugin;
+            } else {
+                ProjectorPlugin.projectorCallbacks.errorCallback(new ProjectorError("[Projector plugin] plugin only working on writable room", ProjectorErrorType.RuntimeError));
+                return undefined;
+            }
+        }
+        await projectorPlugin.init();
+        return projectorPlugin;
+    }
 
     private onPluginAttributesUpdate = async (): Promise<void> => {
         if (!this.attributes.currentSlideUUID || !this.attributes[this.attributes.currentSlideUUID]) {
@@ -81,8 +117,7 @@ export class ProjectorPlugin extends InvisiblePlugin<ProjectorStateStore> {
         if (!ProjectorPlugin.currentSlideManager ||
             this.attributes.currentSlideUUID !== ProjectorPlugin.currentSlideManager.slide?.slideState.taskId) {
                 const slideState = this.attributes[this.attributes.currentSlideUUID] as SlideState;
-                const manager = await this.refreshCurrentSlideManager(this.attributes.currentSlideUUID, slideState.url);
-                await manager.setSlideState(slideState);
+                await this.restoreSlideByState(slideState);
         }
     }
 
@@ -161,12 +196,8 @@ export class ProjectorPlugin extends InvisiblePlugin<ProjectorStateStore> {
     private restoreSlideByState = async (slideState: SlideState): Promise<void> => {
         ProjectorPlugin.logger.info(`[Projector plugin] restore slide by state ${JSON.stringify(slideState)}}`);
         
-        if (!ProjectorPlugin.currentSlideManager) {
-            ProjectorPlugin.currentSlideManager = new ProjectorSlideManager(this);
-            await ProjectorPlugin.currentSlideManager.initSlide();
-        }
-        ProjectorPlugin.currentSlideManager.setResource(slideState.taskId, slideState.url);
-        ProjectorPlugin.currentSlideManager.setSlideState(slideState);
+        const manager = await this.refreshCurrentSlideManager(slideState.taskId, slideState.url);
+        await manager.setSlideState(slideState);
         if (isRoom(this.displayer) && this.displayer.isWritable) {
             const scenePath = `/${ProjectorPlugin.kind}/${slideState.taskId}/${slideState.currentSlideIndex}`;
 
@@ -223,44 +254,7 @@ export class ProjectorPlugin extends InvisiblePlugin<ProjectorStateStore> {
         }
     }
 
-    /**
-     * You can not create slide scene by room.putScenes(), Otherwise, the initialization will fail
-     * Use createSlide() to create a slide and slide scenes
-     * 
-     * Return undefined if initialization failed
-     */ 
-    public static async getInstance(displayer: Displayer, adaptor?: ProjectorAdaptor): Promise<ProjectorPlugin | undefined> {
-        if (adaptor?.logger) {
-            ProjectorPlugin.logger = adaptor.logger;
-        }
-        if (adaptor?.callback) {
-            ProjectorPlugin.projectorCallbacks = adaptor?.callback;
-        }
-        
-        let projectorPlugin = displayer.getInvisiblePlugin(ProjectorPlugin.kind) as
-            | ProjectorPlugin
-            | undefined;
-        if (!projectorPlugin) {
-            if (isRoom(displayer) && displayer.isWritable) {
-                if (!displayer.isWritable) {
-                    ProjectorPlugin.projectorCallbacks.errorCallback(new ProjectorError("[Projector plugin] room is not writable", ProjectorErrorType.RuntimeError));
-                    return undefined;
-                }
-                projectorPlugin = (await displayer.createInvisiblePlugin(
-                    ProjectorPlugin,
-                    {}
-                )) as ProjectorPlugin;
-            } else {
-                ProjectorPlugin.projectorCallbacks.errorCallback(new ProjectorError("[Projector plugin] plugin only working on writable room", ProjectorErrorType.RuntimeError));
-                return undefined;
-            }
-        }
-        await projectorPlugin.init();
-        return projectorPlugin;
-    }
-
     private init = async (): Promise<void> => {
-        
         const scenePath = this.displayer.state.sceneState.scenePath;
         ProjectorPlugin._scenePath = scenePath;
         

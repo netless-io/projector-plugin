@@ -93,25 +93,26 @@
   resolved "https://registry.npmjs.org/@netless/canvas-polyfill/-/canvas-polyfill-0.0.4.tgz#b5f28eefeb9c1e8ff8253fa1b044ccb1dc1b7c9c"
   integrity sha512-7NzsJrba0R/mq/l10SkIZQwbrNVJyPxZYrjK6xL3Ts732iWAVuS2UB0u3s6iGeUVcqV39A679yva8APWRl4M0A==
 
-"@netless/projector-plugin@0.0.7":
-  version "0.0.7"
-  resolved "https://registry.npmjs.org/@netless/projector-plugin/-/projector-plugin-0.0.7.tgz#445f9d132b3124b19e2c04acde64f5c1f3eb53d7"
-  integrity sha512-G8etVrdxTlJs9kV1iz9ZxSvCc9z4LxVzclKgMSMD3ZAAM5K0pZWjk2kEeevn2ib2yAkjMxWdmGMMHhBJZyFkyA==
+"@netless/projector-plugin@0.0.8":
+  version "0.0.8"
+  resolved "https://registry.npmjs.org/@netless/projector-plugin/-/projector-plugin-0.0.8.tgz#1dddf6e2e838f9b4f1c934598e2e2711042f42e8"
+  integrity sha512-rw+aJJpkE3csr8ECtb0kJ7JvKEax3b3QW6FTGUdEsTsUHzgbRE1BzUcJsaY7ESLQ1iIhd1jcy7ezFjnidDxBGg==
   dependencies:
-    "@netless/slide" "0.4.5"
+    "@netless/slide" "0.5.4"
     eventemitter2 "6.4.5"
     react ">=16.8.0"
 
-"@netless/slide@0.4.5":
-  version "0.4.5"
-  resolved "https://registry.npmjs.org/@netless/slide/-/slide-0.4.5.tgz#de02a3a5467fc0ccd5e375332b527d85f1a582fd"
-  integrity sha512-cjvotGLpilw8UtcH42MrCTHfRcGd5FvRIPCI2djhxcD0FtIgl2+XKQn4tE1BFXedgPe5Jgwr1fGmBXsZpJROBw==
+"@netless/slide@0.5.4":
+  version "0.5.4"
+  resolved "https://registry.npmjs.org/@netless/slide/-/slide-0.5.4.tgz#ef8f71072055569e6e8b56d019eaefb6030aec86"
+  integrity sha512-/J8Tn95KVDR462R7XL2mizQddz96yxzP+ZHtUq9k4X0y0HHWCs7h78T2QekFIXTZPoIcz6HHwJN3A8ct6wfM1A==
   dependencies:
     "@juggle/resize-observer" "^3.3.1"
-    "@types/dat.gui" "^0.7.7"
+    "@types/lodash" "^4.14.182"
     dat.gui "^0.7.7"
     eventemitter3 "^4.0.7"
     localforage "^1.10.0"
+    lodash "^4.17.21"
 
 "@netless/xml-js@1.6.15":
   version "1.6.15"
@@ -192,11 +193,6 @@
   resolved "https://registry.npmjs.org/@protobufjs/utf8/-/utf8-1.1.0.tgz#a777360b5b39a1a2e5106f8e858f2fd2d060c570"
   integrity sha512-Vvn3zZrhQZkkBE8LSuW3em98c0FwgO4nxzv6OdSxPKJIEKY2bGbHn+mhGIPerzI4twdxaP8/0+06HBpwf345Lw==
 
-"@types/dat.gui@^0.7.7":
-  version "0.7.7"
-  resolved "https://registry.npmjs.org/@types/dat.gui/-/dat.gui-0.7.7.tgz#2125aedfaa190364c5a50b0447858a7e159aea2e"
-  integrity sha512-CxLCme0He5Jk3uQwfO/fGZMyNhb/ypANzqX0yU9lviBQMlen5SOvQTBQ/Cd9x5mFlUAK5Tk8RgvTyLj1nYkz+w==
-
 "@types/eslint@^8.4.2":
   version "8.4.5"
   resolved "https://registry.npmjs.org/@types/eslint/-/eslint-8.4.5.tgz#acdfb7dd36b91cc5d812d7c093811a8f3d9b31e4"
@@ -214,6 +210,11 @@
   version "7.0.11"
   resolved "https://registry.npmjs.org/@types/json-schema/-/json-schema-7.0.11.tgz#d421b6c527a3037f7c84433fd2c4229e016863d3"
   integrity sha512-wOuvG1SN4Us4rez+tylwwwCV1psiNVOkJeM3AUWUNWg/jDQY2+HE/444y5gc+jBmRqASOm2Oeh5c1axHobwRKQ==
+
+"@types/lodash@^4.14.182":
+  version "4.14.182"
+  resolved "https://registry.npmjs.org/@types/lodash/-/lodash-4.14.182.tgz#05301a4d5e62963227eaafe0ce04dd77c54ea5c2"
+  integrity sha512-/THyiqyQAP9AfARo4pF+aCGcyiQ94tX/Is2I7HofNRqoYLgN1PBoOWu2/zTA5zMxzP5EFutMtWtGAFRKUe961Q==
 
 "@types/long@^4.0.1":
   version "4.0.2"

@@ -93,7 +93,7 @@ export class ProjectorSlideManager {
 
     private throttling = (next: () => void): void => {
         clearTimeout(this.cameraChangeWatcher);
-        this.cameraChangeWatcher = setInterval(() => {
+        this.cameraChangeWatcher = window.setInterval(() => {
             next();
             clearTimeout(this.cameraChangeWatcher);
         }, 300);

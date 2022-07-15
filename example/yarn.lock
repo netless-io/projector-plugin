@@ -93,19 +93,19 @@
   resolved "https://registry.npmjs.org/@netless/canvas-polyfill/-/canvas-polyfill-0.0.4.tgz#b5f28eefeb9c1e8ff8253fa1b044ccb1dc1b7c9c"
   integrity sha512-7NzsJrba0R/mq/l10SkIZQwbrNVJyPxZYrjK6xL3Ts732iWAVuS2UB0u3s6iGeUVcqV39A679yva8APWRl4M0A==
 
-"@netless/projector-plugin@0.0.8":
-  version "0.0.8"
-  resolved "https://registry.npmjs.org/@netless/projector-plugin/-/projector-plugin-0.0.8.tgz#1dddf6e2e838f9b4f1c934598e2e2711042f42e8"
-  integrity sha512-rw+aJJpkE3csr8ECtb0kJ7JvKEax3b3QW6FTGUdEsTsUHzgbRE1BzUcJsaY7ESLQ1iIhd1jcy7ezFjnidDxBGg==
+"@netless/projector-plugin@1.0.1":
+  version "1.0.1"
+  resolved "https://registry.npmjs.org/@netless/projector-plugin/-/projector-plugin-1.0.1.tgz#51ddc852b2abc927f0280a6785875300faaa5f1d"
+  integrity sha512-WY9W1zOYBeMWj5H8HYrZqVTrpXuK5Ctn8TeXRj1ATyPDq94V3/EttrwV8p3VhPxBLZ1hzaLp9SAZrzxScwtOqQ==
   dependencies:
-    "@netless/slide" "0.5.4"
+    "@netless/slide" "0.5.5"
     eventemitter2 "6.4.5"
     react ">=16.8.0"
 
-"@netless/slide@0.5.4":
-  version "0.5.4"
-  resolved "https://registry.npmjs.org/@netless/slide/-/slide-0.5.4.tgz#ef8f71072055569e6e8b56d019eaefb6030aec86"
-  integrity sha512-/J8Tn95KVDR462R7XL2mizQddz96yxzP+ZHtUq9k4X0y0HHWCs7h78T2QekFIXTZPoIcz6HHwJN3A8ct6wfM1A==
+"@netless/slide@0.5.5":
+  version "0.5.5"
+  resolved "https://registry.npmjs.org/@netless/slide/-/slide-0.5.5.tgz#2a378abda0520e605844457b7e8e3bdacaca504c"
+  integrity sha512-bv04g2RJgmzE69sxKVMQf92MnPl57jdz7ou2g/97Gc9qXPH2gBjoj1gO330eDLbFejlLKN13UsDgQhvxVLwcZw==
   dependencies:
     "@juggle/resize-observer" "^3.3.1"
     "@types/lodash" "^4.14.182"

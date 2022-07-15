@@ -18,7 +18,7 @@
   "author": "netless",
   "license": "ISC",
   "dependencies": {
-    "@netless/projector-plugin": "0.0.8",
+    "@netless/projector-plugin": "1.0.0",
     "white-web-sdk": "2.16.24"
   }
 }

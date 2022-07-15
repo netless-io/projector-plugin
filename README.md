@@ -14,6 +14,13 @@ PPT 中途进入操作 -> 初始化时读取全局 state -> 根据全局 state �
 
 ## 开发模式下启动
 在该项目根目录下直接启动，是调用了 dev 文件夹中的代码，该文件夹用于开发使用。
+启动前在 dev 文件夹下的 main.ts 文件内找到以下内容并替换为用户自己的账号信息。
+```js
+const whiteBoardAppientirId = "";   // 在 agora console 的白板配置页面获取到的白板 AppIdentifier，需要该值创建白板 sdk 实例
+const whiteBoardSDKToken = "";  // 在 agora console 的白板配置页面生成的 sdkToken，需要该值创建白板 sdk 实例
+const debugRoomId = "";    // 已经创建好的白板房间 id
+const debugRoomToken = "";  // 已经创建好的白板房间 roomToken，用于加入房间
+```
 ### pnpm
 安装 npm 命令
 ```

@@ -91,14 +91,6 @@ export class ProjectorSlideManager {
         });
     }
 
-    private throttling = (next: () => void): void => {
-        clearTimeout(this.cameraChangeWatcher);
-        this.cameraChangeWatcher = window.setInterval(() => {
-            next();
-            clearTimeout(this.cameraChangeWatcher);
-        }, 300);
-    }
-
     private getSlideObj(): Slide | undefined {
         if (this.slide) {
             return this.slide;

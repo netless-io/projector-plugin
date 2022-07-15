@@ -111,7 +111,7 @@ export class ProjectorSlideManager {
     public computedStyle(state: DisplayerState): void {
         if (ProjectorDisplayer.instance) {
             const {scale, centerX, centerY} = state.cameraState;
-            
+           
             // The midpoints of the ppt and the whiteboard are aligned, zoom center is the midpoint
             const transformOrigin = `center`;
             const x = - (centerX * scale);
@@ -120,25 +120,17 @@ export class ProjectorSlideManager {
                 ProjectorDisplayer.instance.containerRef.style.transformOrigin = transformOrigin;
 
                 if (this.slideWidth && this.slideHeight) {
+                    if (!ProjectorDisplayer.instance!.containerRef!.style.width) {
+                        const newWidth = this.slideWidth * scale
+                        const newHeight = this.slideHeight * scale;
+                        ProjectorDisplayer.instance!.containerRef!.style.width = `${newWidth}px`;
+                        ProjectorDisplayer.instance!.containerRef!.style.height = `${newHeight}px`;
+                    }
+
                     const currentWidth = ProjectorDisplayer.instance.containerRef.style.width;
                     const slideScale = this.slideWidth * scale / parseFloat(currentWidth);
                     ProjectorDisplayer.instance.containerRef.style.transform = `translate(${x}px,${y}px) scale(${slideScale}, ${slideScale})`;
                 }
-                
-                this.throttling(() => {
-                    if (ProjectorDisplayer.instance?.containerRef) {
-                        if (this.slideWidth && this.slideHeight) {
-                            const newWidth = this.slideWidth * scale
-                            const newHeight = this.slideHeight * scale;
-                            ProjectorDisplayer.instance!.containerRef!.style.width = `${newWidth}px`;
-                            ProjectorDisplayer.instance!.containerRef!.style.height = `${newHeight}px`;
-                            
-                            this.slide?.updateFixedFrameSize(newWidth, newHeight, () => {
-                                ProjectorDisplayer.instance!.containerRef!.style.transform = `translate(${x}px,${y}px)`;
-                            });
-                        }
-                    }
-                });
             }
         }
     }
@@ -176,7 +168,7 @@ export class ProjectorSlideManager {
         }
     }
 
-    public initSlide = async(): Promise<Slide> => {
+    public initSlide = async(taskId: string, prefix: string): Promise<Slide> => {
         return waitUntil(() => {
             return !!ProjectorDisplayer.instance && !!ProjectorDisplayer.instance!.containerRef;
         }, 10000).then(() => {
@@ -202,17 +194,14 @@ export class ProjectorSlideManager {
             (window as any).slide = slide as any;
             ProjectorPlugin.logger.info("[Projector plugin] init slide done");
             return this.slide;
-        });
-    }
-
-    public setResource = async (taskId: string, prefix: string): Promise<void> => {
-        const slide = this.getSlideObj();
-        if (slide) {
+        }).then(async slide => {
             slide.setResource(taskId, prefix);
             const [width, height] = await slide.getSizeAsync();
             this.slideWidth = width;
             this.slideHeight = height;
-        }
+            slide.updateFixedFrameSize(width, height);
+            return slide;
+        });
     }
 
     public async setSlideState(slideState: SlideState): Promise<void> {

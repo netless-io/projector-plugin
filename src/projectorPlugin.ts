@@ -291,8 +291,7 @@ export class ProjectorPlugin extends InvisiblePlugin<ProjectorStateStore> {
         }
 
         const slideManager = new ProjectorSlideManager(this);
-        await slideManager.initSlide();
-        slideManager.setResource(uuid, prefix);
+        await slideManager.initSlide(uuid, prefix);
 
         ProjectorPlugin.currentSlideManager = slideManager;
         ProjectorPlugin.logger.info(`[Projector plugin] refresh currentSlideManager object`);

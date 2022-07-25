@@ -17,6 +17,7 @@ The plugin will be placed at the bottom of the whiteboard, and only one plugin i
 
 ## Start in development mode
 Starting directly in the root directory of the project runs the code in the dev folder, which is used for development.
+
 Before starting, find the following content in the main.ts file under the dev folder and replace it with the user's own account information.
 ```js
 const whiteBoardAppientirId = "";   // The whiteboard AppIdentifier obtained from the whiteboard configuration page of the agora console, we needs this value to create a whiteboard sdk instance
@@ -76,11 +77,14 @@ const projectorPlugin = await ProjectorPlugin.getInstance(room, {   // Get the p
 ```
 ### API reference
 After the ppt/pptx document uploaded by the user is successfully converted, a uuid and a series of json files and resource files will be generated, @netless/slide will render these resources as slide objects, and the rendering effect of slide will be as close to the original ppt document as possible.
+
 The plugin will only use uuid as a unique identifier, and users need to record the correspondence between the ppt/pptx document name and uuid.
 
 When the user's whiteboard switches from a slide page to a non-slide page, the plugin will destroy the slide, When the user needs to go back to the slide page again, just call the `changeSlide` method.
+
 #### Create slide
 The user needs to ensure that the task conversion is successful before creating the slide object. After creation, it will automatically jump to the first page of the slide. The slide created by the user will be recorded in the plug-in state and can be switched at any time. The created slide will fill the whiteboard's viewport horizontally or vertically.
+
 If you call create again when a slide with the same uuid has already been created, the state of the slide and all content on the corresponding whiteboard page will be cleared.
 ```js
 projectorPlugin.createSlide({
@@ -103,7 +107,8 @@ projectorPlugin.renderSlidePage(index: number) => Promise<void>;
 
 #### Play animation
 When the ppt is animated, you can trigger the playback animation by calling the following method (the animation with the trigger needs to be clicked to play). The animation api will trigger the page turning action when there is no animation on the current page or when all the animations are played, and trigger the whiteboard page turning at the same time.
-Be careful not to call `room.setScenePath` to turn the slide page, the plug-in will force the whiteboard page number to align with the slide page number, which will invalidate the page turn triggered by setScenePath.
+
+**Be careful not to call `room.setScenePath` to turn the slide page, the plug-in will force the whiteboard page number to align with the slide page number, which will invalidate the page turn triggered by setScenePath.**
 
 ```js
 projectorPlugin.nextStep() => void;
@@ -112,6 +117,7 @@ projectorPlugin.prevStep() => void;
 
 #### Delete slide
 Deletes the specified slide object state and corresponding whiteboard page. The displayed slide cannot be deleted, it must be switched to another slide to delete it.
+
 Returns true if slide exists and the deletion is successful, otherwise returns false.
 ```js
 projectorPlugin.deleteSlide(uuid: string) => boolean;

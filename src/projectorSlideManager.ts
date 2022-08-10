@@ -24,7 +24,6 @@ export class ProjectorSlideManager {
     public slide: Slide | undefined;
     public slideWidth: number | undefined;
     public slideHeight: number | undefined;
-    private cameraChangeWatcher?: number;
 
     constructor(context: ProjectorPlugin) {
         this.context = context;
@@ -140,7 +139,6 @@ export class ProjectorSlideManager {
         this.slide = undefined;
         this.slideHeight = undefined;
         this.slideWidth = undefined;
-        this.cameraChangeWatcher = undefined;
     }
 
     public renderSlide = async (index: number): Promise<void> => {

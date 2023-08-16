@@ -34,7 +34,7 @@ export class ProjectorSlideManager {
         if (isRoom(this.context.displayer) && (this.context.displayer as Room).isWritable) {
             const slideState = this.context.attributes[state.taskId] as SlideState;
             let slideChanged = false;
-            if (slideState.currentSlideIndex !== state.currentSlideIndex) {
+            if (slideState?.currentSlideIndex !== state.currentSlideIndex) {
                 slideChanged = true;
             }
             this.context.setAttributes({[state.taskId]: state});
@@ -198,7 +198,7 @@ export class ProjectorSlideManager {
         const slide = this.getSlideObj();
         if (slide) {
             await this.setSlideAndWhiteboardSize(slide);
-            await slide.setSlideState(slideState);
+            await slide.setSlideState(JSON.parse(JSON.stringify(slideState)));
         }
     }
 }

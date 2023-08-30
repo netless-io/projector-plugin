@@ -336,6 +336,15 @@ export class ProjectorPlugin extends InvisiblePlugin<ProjectorStateStore, any> {
         }
     }
 
+    public async scalePptToFit() {
+        const currentSlideUUID = this.attributes["currentSlideUUID"];
+        const slideState = this.attributes[currentSlideUUID] as SlideState;
+        if (!slideState) {
+            return;
+        }
+        await this.restoreSlideByState(slideState);
+    }
+
     public nextStep(): void {
         this.getManagerInstance()?.nextStep();
     }

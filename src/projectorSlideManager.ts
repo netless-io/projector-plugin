@@ -135,10 +135,15 @@ export class ProjectorSlideManager {
     }
 
     public destory(): void {
-        this.slide?.destroy();
-        this.slide = undefined;
         this.slideHeight = undefined;
         this.slideWidth = undefined;
+        if (!this.slide) {
+            return;
+        }
+        // this.slide.clearSlideCache();
+        this.slide.destroy();
+        this.slide = undefined;
+
     }
 
     public renderSlide = async (index: number): Promise<void> => {
@@ -175,6 +180,7 @@ export class ProjectorSlideManager {
                     width: anchor.getBoundingClientRect().width,
                     height: anchor.getBoundingClientRect().height
                 },
+                logger: console,
             });
             slide.on(SLIDE_EVENTS.stateChange, this.onStateChange);
             slide.on(SLIDE_EVENTS.syncDispatch, this.onSlideEventDispatch);

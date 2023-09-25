@@ -171,7 +171,9 @@ export class ProjectorSlideManager {
                 return this.slide;
             }
             const anchor = ProjectorDisplayer.instance!.containerRef!;
+            console.log("projector-plugin, slide config:", ProjectorPlugin.slideConfig)
             const slide = new Slide({
+                ...ProjectorPlugin.slideConfig,
                 anchor: anchor,
                 interactive: true,
                 mode: "interactive",    // fixed
@@ -180,7 +182,7 @@ export class ProjectorSlideManager {
                     width: anchor.getBoundingClientRect().width,
                     height: anchor.getBoundingClientRect().height
                 },
-                logger: console,
+                logger: ProjectorPlugin.logger,
             });
             slide.on(SLIDE_EVENTS.stateChange, this.onStateChange);
             slide.on(SLIDE_EVENTS.syncDispatch, this.onSlideEventDispatch);

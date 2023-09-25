@@ -11,7 +11,8 @@ import {
     autorun,
 } from "white-web-sdk";
 import { ProjectorDisplayer } from "./projectorDisplayer";
-import {  SLIDE_EVENTS } from "@netless/slide";
+import type { ISlideConfig } from "@netless/slide";
+import { SLIDE_EVENTS } from "@netless/slide";
 import { EventEmitter2 } from "eventemitter2";
 import type { SlideState } from "./projectorSlideManager";
 import { ProjectorSlideManager } from "./projectorSlideManager";
@@ -37,6 +38,7 @@ export enum ProjectorEvents {
 type ProjectorAdaptor = {
     logger?: Logger;
     callback?: ProjectorCallback;
+    slideConfig?: Partial<ISlideConfig>;
 }
 
 
@@ -72,6 +74,8 @@ export class ProjectorPlugin extends InvisiblePlugin<ProjectorStateStore, any> {
         errorCallback: (e: Error) => {console.error(e)}
     };
 
+    public static slideConfig: Partial<ISlideConfig>;
+
     private static currentSlideManager?: ProjectorSlideManager;
     private debounceTimeout: any;
 
@@ -87,6 +91,9 @@ export class ProjectorPlugin extends InvisiblePlugin<ProjectorStateStore, any> {
         }
         if (adaptor?.callback) {
             ProjectorPlugin.projectorCallbacks = adaptor?.callback;
+        }
+        if (adaptor?.slideConfig) {
+            ProjectorPlugin.slideConfig = adaptor.slideConfig;
         }
         
         let projectorPlugin = displayer.getInvisiblePlugin(ProjectorPlugin.kind) as

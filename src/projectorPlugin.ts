@@ -55,7 +55,7 @@ const isRoom = _isRoom as (displayer: Displayer) => displayer is Room;
 
 type WhiteboardEventListener = (event: Event) => void;
 
-export class ProjectorPlugin extends InvisiblePlugin<ProjectorStateStore> {
+export class ProjectorPlugin extends InvisiblePlugin<ProjectorStateStore, any> {
     // a unique king, different from other plugins.
     public static readonly kind: string = "projector-plugin";
     // room scenen, used to determine whether this slide-page is jumped from non-slide-page
@@ -334,6 +334,15 @@ export class ProjectorPlugin extends InvisiblePlugin<ProjectorStateStore> {
         } else {
             ProjectorPlugin.projectorCallbacks.errorCallback(new ProjectorError("[Projector plugin] slide not initiated", ProjectorErrorType.RuntimeError));
         }
+    }
+
+    public async scalePptToFit() {
+        const currentSlideUUID = this.attributes["currentSlideUUID"];
+        const slideState = this.attributes[currentSlideUUID] as SlideState;
+        if (!slideState) {
+            return;
+        }
+        await this.restoreSlideByState(slideState);
     }
 
     public nextStep(): void {

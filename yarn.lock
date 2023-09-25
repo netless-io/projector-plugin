@@ -103,10 +103,10 @@
   resolved "https://registry.npmjs.org/@netless/canvas-polyfill/-/canvas-polyfill-0.0.4.tgz#b5f28eefeb9c1e8ff8253fa1b044ccb1dc1b7c9c"
   integrity sha512-7NzsJrba0R/mq/l10SkIZQwbrNVJyPxZYrjK6xL3Ts732iWAVuS2UB0u3s6iGeUVcqV39A679yva8APWRl4M0A==
 
-"@netless/slide@0.6.0":
-  version "0.6.0"
-  resolved "https://registry.npmjs.org/@netless/slide/-/slide-0.6.0.tgz#99952fa361ade00ecac860ccfd3443ccb7154658"
-  integrity sha512-eLYOcY3rVzXyvQsdDmM6MsrWKH34DZpo5Df5lrkjU7y65UMd6mnZ+soFcMCA8IhS50tJg5U76lmGNp5BG1qzgw==
+"@netless/slide@1.1.2":
+  version "1.1.2"
+  resolved "https://registry.yarnpkg.com/@netless/slide/-/slide-1.1.2.tgz#f7032b5181c9ecea6583548e2ad4c1bbdd40f7f7"
+  integrity sha512-16WaaE/EFZlDYeqmmokjCAQIS98KZcuXkB4e4sGxdHdrGDYLMIchKIqTEZYXddlQdJ3ezhUcJHJ01inGPlqeRA==
   dependencies:
     "@juggle/resize-observer" "^3.3.1"
     "@types/lodash" "^4.14.182"
@@ -115,10 +115,10 @@
     localforage "^1.10.0"
     lodash "^4.17.21"
 
-"@netless/xml-js@1.6.15":
-  version "1.6.15"
-  resolved "https://registry.npmjs.org/@netless/xml-js/-/xml-js-1.6.15.tgz#46516d547b21149bcca732bb199d664791b3240a"
-  integrity sha512-e0emMs7YtDB/ATUns1SJ61R9n9nfVvwwFodoc539Qt0ScksaCLCaFWgpEbLloj9sr60ry6Xd8QFHKULFIZB6zA==
+"@netless/xml-js@1.6.16":
+  version "1.6.16"
+  resolved "https://registry.yarnpkg.com/@netless/xml-js/-/xml-js-1.6.16.tgz#cbf6cc6d73b668162967c371b35c9ff0535fc83a"
+  integrity sha512-QnSH8y3j3DDEW0S3MalYBmR0opeyaecAkzx0ocKYncMDiOdQkhByJgD7AVhXQqH8bA/PVHU0VFP445AbJq6fDQ==
 
 "@nodelib/fs.scandir@2.1.5":
   version "2.1.5"
@@ -1995,14 +1995,14 @@ which@^2.0.1:
   dependencies:
     isexe "^2.0.0"
 
-white-web-sdk@^2.16.26:
-  version "2.16.33"
-  resolved "https://registry.npmjs.org/white-web-sdk/-/white-web-sdk-2.16.33.tgz#f433828e57709a5565f9b9793d8f0560ddf1ee5f"
-  integrity sha512-vv33tvdKXRgaKh5oOJV8FEMd5eb64Jywfe61OcwExX78zt9szH951NHnuwhqdsk8BAH1XwyJ6DcpAhCwXp8F4Q==
+white-web-sdk@^2.16.43:
+  version "2.16.43"
+  resolved "https://registry.yarnpkg.com/white-web-sdk/-/white-web-sdk-2.16.43.tgz#8d7263c31023f99ea997b70771c96262667d7f98"
+  integrity sha512-jDNcUQnyN8E83GzdZE+kBa07ZfTP4Socr0trDcK5ex1GMpDa/qta7YLNfusdo+blWICUFAZG74Q28Iu+YrNZWw==
   dependencies:
     "@juggle/resize-observer" "^3.3.1"
     "@netless/canvas-polyfill" "^0.0.4"
-    "@netless/xml-js" "1.6.15"
+    "@netless/xml-js" "1.6.16"
     atob "^2.1.2"
     bezier-js "^2.4.4"
     bowser "^2.11.0"

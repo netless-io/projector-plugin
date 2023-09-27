@@ -11,7 +11,8 @@ import {
     autorun,
 } from "white-web-sdk";
 import { ProjectorDisplayer } from "./projectorDisplayer";
-import {  SLIDE_EVENTS } from "@netless/slide";
+import type { ISlideConfig } from "@netless/slide";
+import { SLIDE_EVENTS } from "@netless/slide";
 import { EventEmitter2 } from "eventemitter2";
 import type { SlideState } from "./projectorSlideManager";
 import { ProjectorSlideManager } from "./projectorSlideManager";
@@ -37,6 +38,7 @@ export enum ProjectorEvents {
 type ProjectorAdaptor = {
     logger?: Logger;
     callback?: ProjectorCallback;
+    slideConfig?: Partial<ISlideConfig>;
 }
 
 
@@ -72,7 +74,10 @@ export class ProjectorPlugin extends InvisiblePlugin<ProjectorStateStore, any> {
         errorCallback: (e: Error) => {console.error(e)}
     };
 
+    public static slideConfig: Partial<ISlideConfig>;
+
     private static currentSlideManager?: ProjectorSlideManager;
+    private debounceTimeout: any;
 
     /**
      * You can not create slide scene by room.putScenes(), Otherwise, the initialization will fail
@@ -86,6 +91,9 @@ export class ProjectorPlugin extends InvisiblePlugin<ProjectorStateStore, any> {
         }
         if (adaptor?.callback) {
             ProjectorPlugin.projectorCallbacks = adaptor?.callback;
+        }
+        if (adaptor?.slideConfig) {
+            ProjectorPlugin.slideConfig = adaptor.slideConfig;
         }
         
         let projectorPlugin = displayer.getInvisiblePlugin(ProjectorPlugin.kind) as
@@ -116,6 +124,7 @@ export class ProjectorPlugin extends InvisiblePlugin<ProjectorStateStore, any> {
         }
         if (!ProjectorPlugin.currentSlideManager ||
             this.attributes.currentSlideUUID !== ProjectorPlugin.currentSlideManager.slide?.slideState.taskId) {
+                ProjectorPlugin.logger.info(`[Projector plugin] plugin attribute has changed`);
                 const slideState = this.attributes[this.attributes.currentSlideUUID] as SlideState;
                 await this.restoreSlideByState(slideState);
         }
@@ -130,7 +139,7 @@ export class ProjectorPlugin extends InvisiblePlugin<ProjectorStateStore, any> {
         }
         const { type, payload } = ev.payload;
         if (type === SLIDE_EVENTS.syncDispatch) {
-            ProjectorPlugin.logger.info(`[projector pluin]: received event`);
+            ProjectorPlugin.logger.info(`[projector plugin]: received event`, JSON.stringify(ev));
             ProjectorPlugin.currentSlideManager.slide?.emit(SLIDE_EVENTS.syncReceive, payload);
         }
     };
@@ -194,16 +203,19 @@ export class ProjectorPlugin extends InvisiblePlugin<ProjectorStateStore, any> {
     }
 
     private restoreSlideByState = async (slideState: SlideState): Promise<void> => {
-        ProjectorPlugin.logger.info(`[Projector plugin] restore slide by state ${JSON.stringify(slideState)}}`);
-        
-        const manager = await this.refreshCurrentSlideManager(slideState.taskId, slideState.url);
-        await manager.setSlideState(slideState);
-        if (isRoom(this.displayer) && this.displayer.isWritable) {
-            const scenePath = `/${ProjectorPlugin.kind}/${slideState.taskId}/${slideState.currentSlideIndex}`;
+        clearTimeout(this.debounceTimeout)
+        this.debounceTimeout = setTimeout(async () => {
+            ProjectorPlugin.logger.info(`[Projector plugin] restore slide by state ${JSON.stringify(slideState)}}`);
 
-            ProjectorPlugin.logger.info(`[Projector plugin] scenePath change to ${scenePath}`);
-            this.displayer.setScenePath(scenePath);
-        }
+            const manager = await this.refreshCurrentSlideManager(slideState.taskId, slideState.url);
+            await manager.setSlideState(slideState);
+            if (isRoom(this.displayer) && this.displayer.isWritable) {
+                const scenePath = `/${ProjectorPlugin.kind}/${slideState.taskId}/${slideState.currentSlideIndex}`;
+
+                ProjectorPlugin.logger.info(`[Projector plugin] scenePath change to ${scenePath}`);
+                this.displayer.setScenePath(scenePath);
+            }
+        }, 500)
     }
 
     private get isReplay(): boolean {

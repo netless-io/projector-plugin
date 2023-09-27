@@ -135,10 +135,15 @@ export class ProjectorSlideManager {
     }
 
     public destory(): void {
-        this.slide?.destroy();
-        this.slide = undefined;
         this.slideHeight = undefined;
         this.slideWidth = undefined;
+        if (!this.slide) {
+            return;
+        }
+        // this.slide.clearSlideCache();
+        this.slide.destroy();
+        this.slide = undefined;
+
     }
 
     public renderSlide = async (index: number): Promise<void> => {
@@ -166,7 +171,9 @@ export class ProjectorSlideManager {
                 return this.slide;
             }
             const anchor = ProjectorDisplayer.instance!.containerRef!;
+            console.log("projector-plugin, slide config:", ProjectorPlugin.slideConfig)
             const slide = new Slide({
+                ...ProjectorPlugin.slideConfig,
                 anchor: anchor,
                 interactive: true,
                 mode: "interactive",    // fixed
@@ -175,6 +182,7 @@ export class ProjectorSlideManager {
                     width: anchor.getBoundingClientRect().width,
                     height: anchor.getBoundingClientRect().height
                 },
+                logger: ProjectorPlugin.logger,
             });
             slide.on(SLIDE_EVENTS.stateChange, this.onStateChange);
             slide.on(SLIDE_EVENTS.syncDispatch, this.onSlideEventDispatch);

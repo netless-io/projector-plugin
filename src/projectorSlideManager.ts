@@ -109,13 +109,10 @@ export class ProjectorSlideManager {
             const y = - (centerY * scale);
             if (ProjectorDisplayer.instance?.containerRef) {
                 ProjectorDisplayer.instance.containerRef.style.transformOrigin = transformOrigin;
-
                 if (this.slideWidth && this.slideHeight) {
                     if (!ProjectorDisplayer.instance!.containerRef!.style.width) {
-                        const newWidth = this.slideWidth * scale
-                        const newHeight = this.slideHeight * scale;
-                        ProjectorDisplayer.instance!.containerRef!.style.width = `${newWidth}px`;
-                        ProjectorDisplayer.instance!.containerRef!.style.height = `${newHeight}px`;
+                        ProjectorDisplayer.instance!.containerRef!.style.width = `${this.slideWidth}px`;
+                        ProjectorDisplayer.instance!.containerRef!.style.height = `${this.slideHeight}px`;
                     }
 
                     const currentWidth = ProjectorDisplayer.instance.containerRef.style.width;
